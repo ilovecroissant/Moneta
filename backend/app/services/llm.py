@@ -13,7 +13,7 @@ except Exception:  # pragma: no cover - allow running without the lib in some en
 from ..config import settings
 from ..db import get_session
 from ..models import LLMCacheRecord
-from ..schemas import Lesson, LessonGenerationRequest
+from ..schemas import Lesson, LessonGenerationRequest, ChoiceOption
 
 
 def _hash(text: str) -> str:
@@ -45,8 +45,8 @@ You are a friendly finance tutor for teens. Create a concise lesson as strict JS
       "id": string,
       "type": "mcq" | "fill" | "free",
       "prompt": string,
-      "options": [{{"id": "A","text": string}},{{"id":"B","text":string}}] (only for mcq),
-      "correct_answer": string (for mcq/fill),
+      "options": [{{"id": "A","text": string}},{{"id":"B","text":string}},{{"id":"C","text":string}},{{"id":"D","text":string}}] (only for mcq),
+      "correct_answer": string (for mcq/fill; for mcq must be one of "A","B","C","D"),
       "hint": string,
       "explanation": string
     }}
@@ -55,6 +55,8 @@ You are a friendly finance tutor for teens. Create a concise lesson as strict JS
 
 Constraints:
 - Exactly {req.num_questions} questions.
+- For every question with type "mcq": include exactly 4 options with ids A, B, C, D.
+- For every "mcq": set "correct_answer" to one of "A","B","C","D".
 - Tone: short, warm, Duolingo-like.
 - Explanations are one-liners.
 - Keep math simple and age-appropriate.
@@ -92,11 +94,27 @@ def generate_lesson(req: LessonGenerationRequest) -> Tuple[Lesson, bool]:
 
         # Validate
         lesson = Lesson(**data)
+        _enforce_mcq_four_options(lesson)
 
-        # Persist cache
-        session.add(LLMCacheRecord(prompt_hash=ph, response_json=json.dumps(data)))
+        # Persist cache with normalized lesson
+        normalized = lesson.model_dump() if hasattr(lesson, "model_dump") else lesson.dict()
+        session.add(LLMCacheRecord(prompt_hash=ph, response_json=json.dumps(normalized)))
         session.commit()
         return lesson, False
+
+
+def _enforce_mcq_four_options(lesson: Lesson) -> None:
+    desired_ids = ["A", "B", "C", "D"]
+    for q in lesson.questions:
+        if q.type != "mcq":
+            continue
+        existing_texts = [opt.text for opt in (q.options or []) if getattr(opt, "text", None)]
+        while len(existing_texts) < 4:
+            existing_texts.append("Option")
+        existing_texts = existing_texts[:4]
+        q.options = [ChoiceOption(id=oid, text=existing_texts[i]) for i, oid in enumerate(desired_ids)]
+        ca = (q.correct_answer or "").strip().upper()
+        q.correct_answer = ca if ca in desired_ids else "A"
 
 
 def finance_chat(message: str, context: str | None = None) -> str:
