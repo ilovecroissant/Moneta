@@ -76,6 +76,17 @@ class EvaluateResponse(BaseModel):
     recommendation: str
 
 
+# --- Free response check ---
+class FreeCheckRequest(BaseModel):
+    question: Question
+    user_answer: str
+
+
+class FreeCheckResponse(BaseModel):
+    correct: bool
+    feedback: Optional[str] = None
+
+
 # --- Progress ---
 class Progress(BaseModel):
     handle: str

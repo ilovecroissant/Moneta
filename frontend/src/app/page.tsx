@@ -1,31 +1,171 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, TrendingUp, DollarSign, CreditCard, PiggyBank, BookOpen, ChevronRight, Send, X, Award, BarChart3, Zap, Target } from 'lucide-react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
+import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, BookOpen, Send, X, Zap, Target } from 'lucide-react';
+import {
+  chat as chatApi,
+  generateLesson,
+  evaluateAnswers,
+  getProgress,
+  setProgress,
+  type Lesson as ApiLesson,
+  type EvaluateResponse,
+} from '@/lib/api';
+import { checkFree, type FreeCheckResponse } from '@/lib/api';
+
+const CATEGORY_MAP: Record<string, string> = {
+  'Budgeting Basics': 'Budgeting & Saving Basics',
+  'Credit & Debt': 'Credit & Debt',
+  'Investing & Risk': 'Investing & Risk',
+};
+
+// Memoized question component to prevent re-renders
+const QuestionInput = memo(({ question, value, onChange }: { 
+  question: any; 
+  value: string; 
+  onChange: (val: string) => void;
+}) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleBlur = () => {
+    if (localValue !== value) {
+      onChange(localValue);
+    }
+  };
+
+  if (question.type === 'mcq') {
+    return (
+      <div className="space-y-3">
+        {(question.options || []).map((opt: any) => (
+          <button
+            key={opt.id}
+            onClick={() => onChange(opt.id)}
+            type="button"
+            className={`w-full text-left p-5 rounded-2xl border-2 font-semibold text-lg transition-all ${
+              value === opt.id
+                ? 'border-sky-500 bg-sky-50 text-gray-900 shadow-lg scale-105'
+                : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50'
+            }`}
+          >
+            {opt.text}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  if (question.type === 'fill') {
+    return (
+      <input
+        type="text"
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={handleBlur}
+        placeholder="Type your answer"
+        className="w-full border-2 border-gray-300 rounded-2xl px-4 py-4 font-semibold text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+        autoComplete="off"
+        spellCheck={false}
+      />
+    );
+  }
+
+  if (question.type === 'free') {
+    return (
+      <textarea
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={handleBlur}
+        placeholder="Explain in your own words..."
+        className="w-full border-2 border-gray-300 rounded-2xl px-4 py-4 font-semibold text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+        rows={4}
+        autoComplete="off"
+        spellCheck={false}
+      />
+    );
+  }
+
+  return null;
+});
+
+QuestionInput.displayName = 'QuestionInput';
 
 const FinLitPlatform = () => {
-  const [currentView, setCurrentView] = useState('dashboard');
-  const [selectedLesson, setSelectedLesson] = useState(null);
+  const [selectedLesson, setSelectedLesson] = useState<number | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    { role: 'ai', text: 'Hi! I\'m your Finance Coach! Ask me anything about money, saving, investing, or any lesson topic. 💰' }
+  const [chatMessages, setChatMessages] = useState<{ role: 'ai' | 'user'; text: string }[]>([
+    { role: 'ai', text: "Hi! I'm your Finance Coach! Ask me anything about money, saving, investing, or any lesson topic. 💰" },
   ]);
   const [chatInput, setChatInput] = useState('');
-  const [quizAnswers, setQuizAnswers] = useState({});
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [loadingChat, setLoadingChat] = useState(false);
+
+  // Lesson + quiz state (driven by backend)
+  const [generatedLesson, setGeneratedLesson] = useState<ApiLesson | null>(null);
+  const [loadingLesson, setLoadingLesson] = useState(false);
+  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({}); // key: question_id → answer (e.g., 'A' for mcq)
+  const [evaluation, setEvaluation] = useState<EvaluateResponse | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
 
-  // User progress data
+  // Basic demo handle for progress
+  const handleId = 'demo';
+
+  // User progress data (xp/streak from backend; daily fields are UI-only)
   const [userProgress, setUserProgress] = useState({
-    xp: 450,
-    level: 3,
-    streak: 7,
-    completedLessons: [0, 1, 2, 3, 4, 5],
+    xp: 0,
+    level: 1,
+    streak: 0,
+    completedLessons: [0],
     dailyGoal: 50,
-    dailyProgress: 30
+    dailyProgress: 0,
   });
+  const [progressUnlocked, setProgressUnlocked] = useState<string[]>([]);
+  const [lastStreakDate, setLastStreakDate] = useState<string | null>(null);
 
-  // Lessons data structure with visual path
+  // Increment streak once per calendar day upon successful quiz completion
+  const maybeIncrementStreakForToday = async (newXp: number, nodeXp: number) => {
+    try {
+      const today = new Date();
+      const key = today.toISOString().slice(0, 10); // YYYY-MM-DD
+      if (lastStreakDate === key) {
+        await setProgress(handleId, { xp: newXp });
+        return { streak: userProgress.streak, lastDate: lastStreakDate };
+      }
+      const updatedStreak = userProgress.streak + 1;
+      await setProgress(handleId, { xp: newXp, streak: updatedStreak });
+      try { localStorage.setItem('finlit_last_streak_date', key); } catch (_) {}
+      setLastStreakDate(key);
+      return { streak: updatedStreak, lastDate: key };
+    } catch (_) {
+      return { streak: userProgress.streak, lastDate: lastStreakDate };
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const p = await getProgress(handleId);
+        setUserProgress((prev) => ({
+          ...prev,
+          xp: p.xp,
+          streak: p.streak,
+        }));
+        setProgressUnlocked(p.unlocked || []);
+      } catch (e) {
+        // best-effort: keep defaults when backend not available
+      }
+      try {
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('finlit_last_streak_date') : null;
+        if (saved) setLastStreakDate(saved);
+      } catch (_) {}
+    })();
+  }, []);
+
+  // Lessons path (visual nodes). Content is generated via backend when opened
   const lessons = [
     {
       id: 0,
@@ -37,20 +177,7 @@ const FinLitPlatform = () => {
       difficulty: 1,
       locked: false,
       position: { x: 35, y: 10 },
-      questions: [
-        {
-          q: 'A budget helps you:',
-          options: ['Track spending and saving', 'Get free money', 'Avoid taxes', 'Buy more stuff'],
-          correct: 0,
-          explanation: 'A budget is your money roadmap! It helps you see where your money goes and plan for your goals.'
-        },
-        {
-          q: 'The 50/30/20 rule suggests spending ___% on needs.',
-          options: ['20', '30', '50', '70'],
-          correct: 2,
-          explanation: 'The 50/30/20 rule means: 50% needs, 30% wants, 20% savings. It\'s a simple way to balance your money!'
-        }
-      ]
+      // questions generated dynamically
     },
     {
       id: 1,
@@ -133,41 +260,86 @@ const FinLitPlatform = () => {
 
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
-    
-    const newMessage = { role: 'user', text: chatInput };
-    setChatMessages(prev => [...prev, newMessage]);
+    const message = chatInput.trim();
+    setChatMessages((prev) => [...prev, { role: 'user', text: message }]);
     setChatInput('');
-    
-    setTimeout(() => {
-      const aiResponse = { 
-        role: 'ai', 
-        text: 'Great question! A budget is like a game plan for your money. It helps you decide where you money goes before you spend it, so you can save for things you want and need. Think of it as leveling up your money skills! 🎯'
-      };
-      setChatMessages(prev => [...prev, aiResponse]);
-    }, 1000);
+    setLoadingChat(true);
+    try {
+      const res = await chatApi({ message, context: generatedLesson?.title });
+      setChatMessages((prev) => [...prev, { role: 'ai', text: res.answer }]);
+    } catch (e) {
+      setChatMessages((prev) => [...prev, { role: 'ai', text: 'Sorry, I had trouble answering that. Try again in a bit.' }]);
+    } finally {
+      setLoadingChat(false);
+    }
   };
 
-  const handleQuizAnswer = (questionIndex: number, answerIndex: number) => {
-    setQuizAnswers(prev => ({
-      ...prev,
-      [questionIndex]: answerIndex
-    }));
+  const openLesson = async (lessonId: number) => {
+    const node = lessons.find((l) => l.id === lessonId);
+    if (!node || node.locked) return;
+    setSelectedLesson(lessonId);
+    setGeneratedLesson(null);
+    setUserAnswers({});
+    setEvaluation(null);
+    setCurrentQuestionIdx(0);
+    setLoadingLesson(true);
+    try {
+      const category = CATEGORY_MAP[node.category] || node.category;
+      const lvl = node.difficulty || 1;
+      const diffLabel = lvl === 1 ? 'beginner-friendly' : lvl === 2 ? 'intermediate' : 'advanced';
+      const res = await generateLesson({
+        category,
+        level: lvl,
+        num_questions: 5,
+        difficulty: `${diffLabel}; subtopic: ${node.title}`,
+      });
+      setGeneratedLesson(res.lesson);
+    } catch (e) {
+      // fallback when lesson fails to generate
+      setGeneratedLesson(null);
+    } finally {
+      setLoadingLesson(false);
+    }
   };
 
-  const submitQuiz = () => {
-    setQuizSubmitted(true);
-    const lesson = lessons.find(l => l.id === selectedLesson);
-    const correctCount = lesson.questions.filter((q, i) => quizAnswers[i] === q.correct).length;
-    
-    if (correctCount >= Math.ceil(lesson.questions.length * 0.7)) {
-      setUserProgress(prev => ({
-        ...prev,
-        xp: prev.xp + lesson.xp,
-        completedLessons: [...prev.completedLessons, selectedLesson],
-        dailyProgress: prev.dailyProgress + lesson.xp
-      }));
-      setShowCelebration(true);
-      setTimeout(() => setShowCelebration(false), 3000);
+  const setAnswer = (questionId: string, value: string) => {
+    setUserAnswers((prev) => ({ ...prev, [questionId]: value }));
+  };
+
+  const submitQuiz = async () => {
+    if (!generatedLesson) return;
+    setIsSubmitting(true);
+    try {
+      const resp = await evaluateAnswers({
+        lesson: generatedLesson,
+        answers: generatedLesson.questions.map((q) => ({
+          question_id: q.id,
+          user_answer: userAnswers[q.id] || '',
+        })),
+      });
+      setEvaluation(resp);
+
+      // Award XP if passed
+      const node = lessons.find((l) => l.id === selectedLesson);
+      if (node && resp.score >= 0.6) {
+        const newXp = userProgress.xp + node.xp;
+        const { streak: maybeNewStreak } = await maybeIncrementStreakForToday(newXp, node.xp);
+        setUserProgress((prev) => ({
+          ...prev,
+          xp: newXp,
+          streak: maybeNewStreak,
+          completedLessons: prev.completedLessons.includes(node.id)
+            ? prev.completedLessons
+            : [...prev.completedLessons, node.id],
+          dailyProgress: prev.dailyProgress + node.xp,
+        }));
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 3000);
+      }
+    } catch (e) {
+      // ignore for MVP
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -215,6 +387,9 @@ const FinLitPlatform = () => {
         </div>
       </div>
 
+      {/* Micro Simulation */}
+      <MicroSimulation />
+
       {/* Achievements */}
       <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
         <h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
@@ -254,7 +429,9 @@ const FinLitPlatform = () => {
         <div className="relative">
           {lessons.map((lesson, index) => {
             const isCompleted = userProgress.completedLessons.includes(lesson.id);
-            const isLocked = lesson.locked;
+            const token = `${CATEGORY_MAP[lesson.category] || lesson.category}:1`;
+            const categoryUnlocked = progressUnlocked.includes(token);
+            const isLocked = lesson.difficulty > 1 || !categoryUnlocked;
             const isNext = !isCompleted && !isLocked && 
                           (index === 0 || userProgress.completedLessons.includes(lessons[index - 1].id));
             
@@ -273,7 +450,8 @@ const FinLitPlatform = () => {
                 )}
 
                 <button
-                  onClick={() => !isLocked && setSelectedLesson(lesson.id)}
+                  onClick={() => !isLocked && openLesson(lesson.id)}
+                  type="button"
                   disabled={isLocked}
                   className={`relative group transition-all duration-300 ${
                     isLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-110'
@@ -350,60 +528,159 @@ const FinLitPlatform = () => {
   );
 
   const LessonView = () => {
-    const lesson = lessons.find(l => l.id === selectedLesson);
-    if (!lesson) return null;
+    const node = lessons.find((l) => l.id === selectedLesson);
+    if (!node) return null;
+    const [checkMessage, setCheckMessage] = useState<string | null>(null);
+    const [checkingFree, setCheckingFree] = useState(false);
+
+    const totalQuestions = generatedLesson?.questions.length || 0;
+    const answeredCount = useMemo(() => {
+      if (!generatedLesson) return 0;
+      return generatedLesson.questions.filter((q) => (userAnswers[q.id] || '').trim() !== '').length;
+    }, [generatedLesson, userAnswers]);
+
+    const progressWidth = totalQuestions ? (answeredCount / totalQuestions) * 100 : 0;
 
     return (
       <div className="max-w-2xl mx-auto">
         {/* Progress Bar */}
         <div className="bg-white rounded-full h-4 mb-6 overflow-hidden shadow-inner">
-          <div 
+          <div
             className="h-full bg-gradient-to-r from-green-400 to-green-500 transition-all duration-300"
-            style={{ width: `${((Object.keys(quizAnswers).length) / (lesson.questions?.length || 1)) * 100}%` }}
+            style={{ width: `${progressWidth}%` }}
           />
         </div>
 
         <div className="bg-white rounded-3xl p-8 shadow-2xl border-2 border-gray-100">
-          {!quizSubmitted ? (
+          {!evaluation ? (
             <>
               <div className="text-center mb-8">
-                <div className="text-6xl mb-4">{lesson.icon}</div>
-                <h2 className="text-3xl font-black text-gray-800 mb-2">{lesson.title}</h2>
-                <p className="text-gray-600 font-semibold">{lesson.category}</p>
+                <div className="text-6xl mb-4">{node.icon}</div>
+                <h2 className="text-3xl font-black text-gray-800 mb-2">{generatedLesson?.title || node.title}</h2>
+                <p className="text-gray-600 font-semibold">{generatedLesson?.category || node.category}</p>
               </div>
 
-              {lesson.questions ? (
+              {loadingLesson ? (
+                <div className="text-center py-12 text-gray-500">
+                  <BookOpen className="w-20 h-20 mx-auto mb-4 opacity-30" />
+                  <p className="font-semibold">Generating lesson...</p>
+                </div>
+              ) : generatedLesson ? (
                 <div className="space-y-8">
-                  {lesson.questions.map((question, qIndex) => (
-                    <div key={qIndex} className="space-y-4">
-                      <h3 className="text-2xl font-bold text-gray-800 leading-snug">
-                        {question.q}
-                      </h3>
-                      <div className="space-y-3">
-                        {question.options.map((option, oIndex) => (
-                          <button
-                            key={oIndex}
-                            onClick={() => handleQuizAnswer(qIndex, oIndex)}
-                            className={`w-full text-left p-5 rounded-2xl border-3 font-semibold text-lg transition-all ${
-                              quizAnswers[qIndex] === oIndex
-                                ? 'border-sky-500 bg-sky-50 shadow-lg scale-105'
-                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                            }`}
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                  {(() => {
+                    const q = generatedLesson.questions[currentQuestionIdx];
+                    if (!q) return null;
+                    return (
+                      <div key={`${q.id}-${currentQuestionIdx}`} className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-2xl font-bold text-gray-800 leading-snug">{q.prompt}</h3>
+                          <span className="text-sm font-semibold text-gray-500">{currentQuestionIdx + 1}/{totalQuestions}</span>
+                        </div>
 
-                  <button
-                    onClick={submitQuiz}
-                    disabled={Object.keys(quizAnswers).length < lesson.questions.length}
-                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-black text-xl py-5 rounded-2xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 hover:scale-105"
-                  >
-                    CHECK
-                  </button>
+                        <QuestionInput 
+                          question={q}
+                          value={userAnswers[q.id] || ''}
+                          onChange={(val) => setAnswer(q.id, val)}
+                        />
+
+                        {q.hint && (
+                          <div className="text-sm text-gray-500 font-semibold">Hint: {q.hint}</div>
+                        )}
+
+                        {checkMessage && (
+                          <div className={`text-sm font-bold ${checkMessage.startsWith('✅') ? 'text-green-700' : 'text-red-700'}`}>{checkMessage}</div>
+                        )}
+
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCheckMessage(null);
+                              // Capture current index to guard against async updates
+                              const idxAtClick = currentQuestionIdx;
+                              // Evaluate current question only
+                              const uaRaw = (userAnswers[q.id] || '').trim();
+                              const caRaw = (q.correct_answer || '').trim();
+                              const ua = uaRaw.toUpperCase();
+                              const ca = caRaw.toUpperCase();
+                              const advanceIfSame = () =>
+                                setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
+                              let isCorrect = false;
+                              const proceed = (ok: boolean, message?: string) => {
+                                if (ok) {
+                                  setCheckMessage(message || '✅ Correct!');
+                                  setTimeout(() => {
+                                    setCheckMessage(null);
+                                    advanceIfSame();
+                                  }, 600);
+                                } else {
+                                  setCheckMessage(message || '❌ Not quite. Try again!');
+                                }
+                              };
+
+                              if (q.type === 'mcq') {
+                                isCorrect = ua !== '' && ca !== '' && ua === ca;
+                                proceed(isCorrect);
+                              } else if (q.type === 'fill') {
+                                const normUa = uaRaw.toLowerCase();
+                                const normCa = caRaw.toLowerCase();
+                                isCorrect = normCa !== '' && (normUa === normCa || normUa.includes(normCa) || normCa.includes(normUa));
+                                proceed(isCorrect);
+                              } else {
+                                // free text -> LLM check
+                                if (!uaRaw) {
+                                  setCheckMessage('❌ Please enter an answer.');
+                                  return;
+                                }
+                                setCheckingFree(true);
+                                checkFree({ question: q, user_answer: uaRaw })
+                                  .then((res: FreeCheckResponse) => {
+                                    proceed(!!res.correct, res.correct ? '✅ Nice!' : res.feedback || '❌ Try elaborating.');
+                                  })
+                                  .catch(() => proceed(false, '❌ Could not check answer. Try again.'))
+                                  .finally(() => setCheckingFree(false));
+                              }
+                            }}
+                            className="flex-1 bg-sky-600 text-white font-black py-4 rounded-2xl hover:bg-sky-700 transition-colors shadow-md disabled:opacity-50"
+                            disabled={checkingFree}
+                          >
+                            {checkingFree ? 'CHECKING…' : 'CHECK'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const idxAtClick = currentQuestionIdx;
+                              // Only allow next if correct answer is present and matches
+                              const ca = (q.correct_answer || '').trim();
+                              if (!ca && q.type !== 'free') return; // require correct answers for non-free
+                              const ua = (userAnswers[q.id] || '').trim();
+                              const allow = q.type === 'mcq' ? ua.toUpperCase() === ca.toUpperCase() : (q.type === 'fill' ? ua.length > 0 && ca.length > 0 : !!ua);
+                              if (allow) {
+                                setCheckMessage(null);
+                                setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
+                              }
+                            }}
+                            disabled={currentQuestionIdx >= totalQuestions - 1 || checkingFree}
+                            className="px-6 bg-gray-100 text-gray-700 font-bold rounded-2xl border-2 border-gray-200 hover:bg-gray-200 disabled:opacity-50"
+                          >
+                            NEXT
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {currentQuestionIdx === totalQuestions - 1 && (
+                    <button
+                      onClick={submitQuiz}
+                      disabled={!generatedLesson || answeredCount < totalQuestions || isSubmitting}
+                      type="button"
+                      className="mt-6 w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-black text-xl py-5 rounded-2xl hover:from-green-600 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSubmitting ? 'CHECKING...' : 'FINISH' }
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500">
@@ -414,53 +691,57 @@ const FinLitPlatform = () => {
             </>
           ) : (
             <div className="text-center py-12">
-              {/* Results */}
-              {lesson.questions.map((question, qIndex) => (
-                <div key={qIndex} className="mb-8 text-left">
-                  <div className={`p-6 rounded-2xl ${
-                    quizAnswers[qIndex] === question.correct
-                      ? 'bg-green-50 border-2 border-green-400'
-                      : 'bg-red-50 border-2 border-red-400'
-                  }`}>
-                    <div className="flex items-start gap-3 mb-3">
-                      {quizAnswers[qIndex] === question.correct ? (
-                        <CheckCircle className="w-8 h-8 text-green-500 flex-shrink-0 mt-1" />
-                      ) : (
-                        <X className="w-8 h-8 text-red-500 flex-shrink-0 mt-1" />
-                      )}
-                      <div>
-                        <p className="font-bold text-gray-800 text-lg mb-2">{question.q}</p>
-                        {quizAnswers[qIndex] !== question.correct && (
-                          <div className="space-y-2">
-                            <p className="text-red-700 font-semibold">
-                              Your answer: {question.options[quizAnswers[qIndex]]}
-                            </p>
-                            <p className="text-green-700 font-semibold">
-                              Correct answer: {question.options[question.correct]}
-                            </p>
-                          </div>
+              {generatedLesson?.questions.map((q, qIndex) => {
+                const detail = evaluation.details.find((d) => d.question_id === q.id);
+                const isCorrect = !!detail?.correct;
+                const userAns = userAnswers[q.id] || '';
+                const correctAns = detail?.correct_answer || '';
+                const correctText = q.type === 'mcq'
+                  ? (q.options || []).find((o) => o.id === correctAns)?.text || correctAns
+                  : correctAns;
+                const userText = q.type === 'mcq'
+                  ? (q.options || []).find((o) => o.id === userAns)?.text || userAns
+                  : userAns;
+
+                return (
+                  <div key={`${q.id}-${qIndex}`} className="mb-8 text-left">
+                    <div className={`p-6 rounded-2xl ${isCorrect ? 'bg-green-50 border-2 border-green-400' : 'bg-red-50 border-2 border-red-400'}`}>
+                      <div className="flex items-start gap-3 mb-3">
+                        {isCorrect ? (
+                          <CheckCircle className="w-8 h-8 text-green-500 flex-shrink-0 mt-1" />
+                        ) : (
+                          <X className="w-8 h-8 text-red-500 flex-shrink-0 mt-1" />
                         )}
+                        <div>
+                          <p className="font-bold text-gray-800 text-lg mb-2">{q.prompt}</p>
+                          {!isCorrect && (
+                            <div className="space-y-2">
+                              <p className="text-red-700 font-semibold">Your answer: {userText || '—'}</p>
+                              <p className="text-green-700 font-semibold">Correct answer: {correctText || '—'}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="bg-blue-100 border-l-4 border-blue-500 p-4 rounded-lg ml-11">
+                        <p className="text-blue-800 font-semibold text-sm">💡 {detail?.explanation || q.explanation}</p>
                       </div>
                     </div>
-                    <div className="bg-blue-100 border-l-4 border-blue-500 p-4 rounded-lg ml-11">
-                      <p className="text-blue-800 font-semibold text-sm">
-                        💡 {question.explanation}
-                      </p>
-                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="bg-gradient-to-br from-amber-400 to-amber-500 rounded-3xl p-8 text-white shadow-xl mt-8">
                 <div className="text-7xl mb-4">🎉</div>
                 <h3 className="text-3xl font-black mb-2">Awesome!</h3>
-                <p className="text-xl font-bold mb-6">+{lesson.xp} XP</p>
+                <p className="text-xl font-bold mb-6">+{lessons.find((l) => l.id === selectedLesson)?.xp || 0} XP</p>
                 <button
                   onClick={() => {
                     setSelectedLesson(null);
-                    setQuizAnswers({});
-                    setQuizSubmitted(false);
+                    setGeneratedLesson(null);
+                    setUserAnswers({});
+                    setEvaluation(null);
                   }}
+                  type="button"
                   className="bg-white text-amber-600 font-black px-8 py-4 rounded-2xl hover:bg-amber-50 transition-all shadow-lg text-lg"
                 >
                   CONTINUE
@@ -474,9 +755,11 @@ const FinLitPlatform = () => {
         <button
           onClick={() => {
             setSelectedLesson(null);
-            setQuizAnswers({});
-            setQuizSubmitted(false);
+            setGeneratedLesson(null);
+            setUserAnswers({});
+            setEvaluation(null);
           }}
+          type="button"
           className="mt-6 w-full py-4 text-gray-600 hover:text-gray-800 font-bold text-lg"
         >
           EXIT
@@ -518,6 +801,7 @@ const FinLitPlatform = () => {
       {/* AI Coach Floating Button - Duolingo Style */}
       <button
         onClick={() => setChatOpen(!chatOpen)}
+        type="button"
         className="fixed bottom-8 right-8 w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full shadow-2xl hover:shadow-blue-300 transition-all hover:scale-110 flex items-center justify-center border-4 border-white"
       >
         <MessageCircle className="w-7 h-7" />
@@ -535,6 +819,7 @@ const FinLitPlatform = () => {
             </div>
             <button 
               onClick={() => setChatOpen(false)} 
+              type="button"
               className="hover:bg-white/20 rounded-full p-2 transition-all"
             >
               <X className="w-5 h-5" />
@@ -553,6 +838,13 @@ const FinLitPlatform = () => {
                 </div>
               </div>
             ))}
+            {loadingChat && (
+              <div className="flex justify-start">
+                <div className="max-w-[75%] p-4 rounded-2xl font-semibold shadow-md bg-white text-gray-800 rounded-bl-sm border-2 border-gray-100">
+                  Thinking...
+                </div>
+              </div>
+            )}
           </div>
           
           <div className="border-t-2 border-gray-100 p-4 bg-white">
@@ -561,13 +853,20 @@ const FinLitPlatform = () => {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
                 placeholder="Ask me anything..."
-                className="flex-1 border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 font-semibold text-amber-900"
+                className="flex-1 border-2 border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 font-semibold text-gray-900 placeholder-gray-400 bg-white"
               />
               <button
                 onClick={handleSendMessage}
-                className="bg-blue-500 text-white p-3 rounded-xl hover:bg-blue-600 transition-all shadow-md"
+                disabled={loadingChat}
+                type="button"
+                className="bg-blue-500 text-white p-3 rounded-xl hover:bg-blue-600 transition-all shadow-md disabled:opacity-50"
               >
                 <Send className="w-5 h-5" />
               </button>
@@ -582,6 +881,58 @@ const FinLitPlatform = () => {
           <div className="text-9xl animate-bounce">🎉</div>
         </div>
       )}
+    </div>
+  );
+};
+
+// Simple micro-simulation widget
+const MicroSimulation = () => {
+  const [amount, setAmount] = React.useState<number>(50);
+  const [years, setYears] = React.useState<number>(5);
+  const [rate, setRate] = React.useState<number>(8);
+
+  const monthlyRate = rate / 100 / 12;
+  const months = years * 12;
+  const future = amount * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
+
+  return (
+    <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
+      <h3 className="text-xl font-black text-gray-800 mb-4">What if you save monthly?</h3>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className="block text-xs font-bold text-gray-600 mb-1">Monthly Amount</label>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value) || 0)}
+            className="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-gray-900"
+            min={0}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-600 mb-1">Years</label>
+          <input
+            type="number"
+            value={years}
+            onChange={(e) => setYears(Number(e.target.value) || 0)}
+            className="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-gray-900"
+            min={0}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-600 mb-1">Annual Return %</label>
+          <input
+            type="number"
+            value={rate}
+            onChange={(e) => setRate(Number(e.target.value) || 0)}
+            className="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-gray-900"
+            min={0}
+          />
+        </div>
+      </div>
+      <div className="bg-blue-50 border-2 border-blue-100 rounded-2xl p-4 font-bold text-blue-800">
+        If you save ${amount}/mo for {years} years at {rate}%: ≈ ${future.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+      </div>
     </div>
   );
 };

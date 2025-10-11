@@ -7,8 +7,10 @@ from ..schemas import (
     EvaluateRequest,
     EvaluateResponse,
     EvaluateDetail,
+    FreeCheckRequest,
+    FreeCheckResponse,
 )
-from ..services.llm import generate_lesson
+from ..services.llm import generate_lesson, check_free_response
 
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
@@ -69,5 +71,14 @@ def evaluate_answers(req: EvaluateRequest) -> EvaluateResponse:
         details=details,
         recommendation=recommendation,
     )
+
+
+@router.post("/check_free", response_model=FreeCheckResponse)
+def check_free(req: FreeCheckRequest) -> FreeCheckResponse:
+    try:
+        ok, feedback = check_free_response(req.question, req.user_answer)
+        return FreeCheckResponse(correct=ok, feedback=feedback)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
