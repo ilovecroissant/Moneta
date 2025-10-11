@@ -1,2 +1,2 @@
-# Package initializer
+"""Backend app package."""
 

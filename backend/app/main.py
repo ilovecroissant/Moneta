@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
+from .db import init_db
+from .routers import lessons, chat, progress
 
 app = FastAPI(title="Finance Learning API")
 
@@ -17,4 +19,13 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    init_db()
+
+app.include_router(lessons.router)
+app.include_router(chat.router)
+app.include_router(progress.router)
 
