@@ -1,103 +1,210 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import {
+  API_BASE_URL,
+  generateLesson,
+  evaluateAnswers,
+  chat,
+  getProgress,
+  setProgress,
+  type Lesson,
+} from "@/lib/api";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [category, setCategory] = useState("Credit & Debt");
+  const [level, setLevel] = useState(1);
+  const [numQuestions, setNumQuestions] = useState(3);
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [evalResult, setEvalResult] = useState<any>(null);
+  const [message, setMessage] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [handle, setHandle] = useState("alex");
+  const [progress, setProgressState] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  async function onGenerate() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await generateLesson({
+        category,
+        level,
+        num_questions: numQuestions,
+      });
+      setLesson(res.lesson);
+      setEvalResult(null);
+    } catch (e: any) {
+      setError(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onEvaluate() {
+    if (!lesson) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // naive: use first question and the single input answer
+      const first = lesson.questions[0];
+      const res = await evaluateAnswers({
+        lesson,
+        answers: [{ question_id: first.id, user_answer: answer }],
+      });
+      setEvalResult(res);
+    } catch (e: any) {
+      setError(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onChat() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await chat({ message });
+      setAnswer(res.answer);
+    } catch (e: any) {
+      setError(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onGetProgress() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getProgress(handle);
+      setProgressState(res);
+    } catch (e: any) {
+      setError(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onSetProgress() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await setProgress(handle, { xp: 25, streak: 2 });
+      setProgressState(res);
+    } catch (e: any) {
+      setError(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen p-6 max-w-3xl mx-auto space-y-6 bg-white text-gray-900 dark:bg-neutral-900 dark:text-neutral-100">
+      <h1 className="text-2xl font-bold">Finance Learning API Tester</h1>
+      <p className="text-sm text-gray-600 dark:text-gray-300">Backend: {API_BASE_URL}</p>
+
+      <section className="space-y-3 border p-4 rounded bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 shadow-sm">
+        <h2 className="font-semibold">Generate Lesson</h2>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            className="border px-2 py-1 rounded bg-white text-gray-900 dark:bg-neutral-700 dark:text-neutral-100 border-gray-300 dark:border-neutral-600 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="Category"
+          />
+          <input
+            className="border px-2 py-1 rounded w-24 bg-white text-gray-900 dark:bg-neutral-700 dark:text-neutral-100 border-gray-300 dark:border-neutral-600 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            type="number"
+            value={level}
+            onChange={(e) => setLevel(Number(e.target.value))}
+            placeholder="Level"
+          />
+          <input
+            className="border px-2 py-1 rounded w-24 bg-white text-gray-900 dark:bg-neutral-700 dark:text-neutral-100 border-gray-300 dark:border-neutral-600 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            type="number"
+            value={numQuestions}
+            onChange={(e) => setNumQuestions(Number(e.target.value))}
+            placeholder="# Questions"
+          />
+          <button className="border px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 border-transparent disabled:opacity-50" onClick={onGenerate} disabled={loading}>
+            Generate
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        {lesson && (
+          <pre className="text-xs whitespace-pre-wrap bg-neutral-900 text-neutral-100 dark:bg-neutral-800 dark:text-neutral-100 p-3 rounded overflow-auto">
+{JSON.stringify(lesson, null, 2)}
+          </pre>
+        )}
+      </section>
+
+      <section className="space-y-3 border p-4 rounded bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 shadow-sm">
+        <h2 className="font-semibold">Evaluate (first question only)</h2>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            className="border px-2 py-1 rounded bg-white text-gray-900 dark:bg-neutral-700 dark:text-neutral-100 border-gray-300 dark:border-neutral-600 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            placeholder="Your answer (e.g., A or text)"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          <button className="border px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 border-transparent disabled:opacity-50" onClick={onEvaluate} disabled={loading || !lesson}>
+            Evaluate
+          </button>
+        </div>
+        {evalResult && (
+          <pre className="text-xs whitespace-pre-wrap bg-neutral-900 text-neutral-100 dark:bg-neutral-800 dark:text-neutral-100 p-3 rounded overflow-auto">
+{JSON.stringify(evalResult, null, 2)}
+          </pre>
+        )}
+      </section>
+
+      <section className="space-y-3 border p-4 rounded bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 shadow-sm">
+        <h2 className="font-semibold">Finance Chat</h2>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            className="border px-2 py-1 rounded flex-1 bg-white text-gray-900 dark:bg-neutral-700 dark:text-neutral-100 border-gray-300 dark:border-neutral-600 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Ask a question (e.g., What is compound interest?)"
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+          <button className="border px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 border-transparent disabled:opacity-50" onClick={onChat} disabled={loading}>
+            Send
+          </button>
+        </div>
+        {!!answer && (
+          <pre className="text-xs whitespace-pre-wrap bg-amber-50 text-amber-900 dark:bg-neutral-800 dark:text-neutral-100 p-3 rounded overflow-auto">
+{answer}
+          </pre>
+        )}
+      </section>
+
+      <section className="space-y-3 border p-4 rounded bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 shadow-sm">
+        <h2 className="font-semibold">Progress</h2>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            className="border px-2 py-1 rounded bg-white text-gray-900 dark:bg-neutral-700 dark:text-neutral-100 border-gray-300 dark:border-neutral-600 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
+            placeholder="Handle"
           />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          <button className="border px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 border-transparent disabled:opacity-50" onClick={onGetProgress} disabled={loading}>
+            Get
+          </button>
+          <button className="border px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 border-transparent disabled:opacity-50" onClick={onSetProgress} disabled={loading}>
+            Set xp=25, streak=2
+          </button>
+        </div>
+        {progress && (
+          <pre className="text-xs whitespace-pre-wrap bg-neutral-900 text-neutral-100 dark:bg-neutral-800 dark:text-neutral-100 p-3 rounded overflow-auto">
+{JSON.stringify(progress, null, 2)}
+          </pre>
+        )}
+      </section>
+
+      {error && (
+        <div className="text-sm border p-2 rounded bg-red-50 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-700">{error}</div>
+      )}
     </div>
   );
 }
