@@ -37,16 +37,27 @@ def evaluate_answers(req: EvaluateRequest) -> EvaluateResponse:
     total = len(req.lesson.questions)
 
     for q in req.lesson.questions:
-        ua = _norm(answer_map.get(q.id))
+        raw_ua = (answer_map.get(q.id) or "").strip()
+        ua = _norm(raw_ua)
         correct = False
         ca = _norm(q.correct_answer)
+        explanation = q.explanation
 
         if q.type == "mcq":
             correct = ua == ca and ca != ""
         elif q.type == "fill":
             correct = ca != "" and (ua == ca or ca in ua or ua in ca)
+        elif q.type == "free":
+            try:
+                ok, feedback = check_free_response(q, raw_ua)
+                correct = bool(ok)
+                explanation = feedback or q.explanation
+            except Exception:
+                # Fallback: do not penalize empty implementation environments
+                correct = ua != ""
+                explanation = (explanation or "") or "Checked without AI."
         else:
-            correct = False  # free-text not auto-graded in MVP
+            correct = False
 
         if correct:
             correct_count += 1
@@ -55,7 +66,7 @@ def evaluate_answers(req: EvaluateRequest) -> EvaluateResponse:
             question_id=q.id,
             correct=correct,
             correct_answer=q.correct_answer,
-            explanation=q.explanation,
+            explanation=explanation,
         ))
 
     score = round(correct_count / max(1, total), 2)
