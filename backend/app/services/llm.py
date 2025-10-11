@@ -13,7 +13,7 @@ except Exception:  # pragma: no cover - allow running without the lib in some en
 from ..config import settings
 from ..db import get_session
 from ..models import LLMCacheRecord
-from ..schemas import Lesson, LessonGenerationRequest, ChoiceOption
+from ..schemas import Lesson, LessonGenerationRequest, ChoiceOption, Question
 
 
 def _hash(text: str) -> str:
@@ -126,4 +126,21 @@ def finance_chat(message: str, context: str | None = None) -> str:
     full = f"{system}\nContext: {context or 'n/a'}\nQuestion: {message}"
     resp = model.generate_content(full)
     return (getattr(resp, "text", "") or "").strip()
+
+
+def check_free_response(question: Question, user_answer: str) -> Tuple[bool, str]:
+    model = _ensure_model()
+    rubric = (
+        "You are grading a teen's short finance answer. "
+        "Decide if it correctly and succinctly answers the prompt. "
+        "Respond with strict JSON: {\"correct\": boolean, \"feedback\": string}."
+    )
+    prompt = f"{rubric}\nPrompt: {question.prompt}\nStudent: {user_answer}"
+    resp = model.generate_content(prompt)
+    raw = (getattr(resp, "text", "") or "").strip()
+    try:
+        data = json.loads(_extract_json(raw))
+        return bool(data.get("correct", False)), str(data.get("feedback", ""))
+    except Exception:
+        return False, "Couldn't check your answer. Try again with a clearer response."
 
