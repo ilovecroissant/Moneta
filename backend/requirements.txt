@@ -7,4 +7,4 @@ python-dotenv
 google-generativeai
 httpx
 tenacity
-
+pydantic-settings
