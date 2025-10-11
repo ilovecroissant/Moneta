@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+sqlalchemy
+pydantic
+python-dotenv
+google-generativeai
+httpx
+tenacity
+
