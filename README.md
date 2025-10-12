@@ -123,10 +123,10 @@ npm run dev                 # http://localhost:3000
 
 ### Database
 The SQLite database (`backend/app.db`) is auto-created on first run with these tables:
-- **user** - User accounts (username, email, password_hash, xp, streak)
+- **user** - User accounts (username, email, password_hash, xp, streak, completed_lessons)
 - **session** - Auth sessions (token, user_id, expires_at)
 - **passwordresettoken** - Password reset tokens (token, email, expires_at)
-- **userprogressrecord** - Lesson progress tracking
+- **xpevent** - XP change history for daily tracking
 - **llmcacherecord** - AI response caching
 
 **View database:**

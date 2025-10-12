@@ -48,6 +48,8 @@ export interface ProgressResponse {
   unlocked: string[];
   completed_lessons: number[];
   daily_xp: number;
+  unlocked_achievements: string[];
+  perfect_scores: number;
 }
 
 // Chat API
@@ -186,12 +188,18 @@ export async function getProgress(handle: string): Promise<ProgressResponse> {
   } catch (error) {
     console.error('Get progress API error:', error);
     // Return default if backend fails
-    return { xp: 0, streak: 0, unlocked: [], completed_lessons: [], daily_xp: 0 };
+    return { xp: 0, streak: 0, unlocked: [], completed_lessons: [], daily_xp: 0, unlocked_achievements: [], perfect_scores: 0 };
   }
 }
 
 // Set Progress to backend
-export async function setProgress(handle: string, update: { xp?: number; streak?: number; completed_lessons?: number[] }): Promise<ProgressResponse> {
+export async function setProgress(handle: string, update: { 
+  xp?: number; 
+  streak?: number; 
+  completed_lessons?: number[];
+  unlocked_achievements?: string[];
+  perfect_scores?: number;
+}): Promise<ProgressResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/progress/${handle}`, {
       method: 'POST',

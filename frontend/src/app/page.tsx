@@ -305,7 +305,7 @@ const MonetaPlatform = () => {
   const [showAllAchievementsModal, setShowAllAchievementsModal] = useState(false);
 
   // Check if user has unlocked an achievement
-  const checkAchievements = (completedLessons: number[], streak: number, perfectScores: number) => {
+  const checkAchievements = async (completedLessons: number[], streak: number, perfectScores: number) => {
     const newlyUnlocked: Achievement[] = [];
     
     ACHIEVEMENTS.forEach(achievement => {
@@ -331,13 +331,19 @@ const MonetaPlatform = () => {
     // Show modal for newly unlocked achievements (one at a time)
     if (newlyUnlocked.length > 0) {
       const achievementIds = newlyUnlocked.map(a => a.id);
-      setUnlockedAchievements(prev => [...prev, ...achievementIds]);
+      const updatedAchievements = [...unlockedAchievements, ...achievementIds];
+      setUnlockedAchievements(updatedAchievements);
       
-      // Store in localStorage
+      // Save to backend
       try {
-        const storageKey = `moneta_achievements_${handleId}`;
-        localStorage.setItem(storageKey, JSON.stringify([...unlockedAchievements, ...achievementIds]));
-      } catch (_) {}
+        console.log('💾 Saving achievements to backend:', updatedAchievements);
+        await setProgress(handleId, { 
+          unlocked_achievements: updatedAchievements 
+        });
+        console.log('✅ Achievements saved to backend');
+      } catch (err) {
+        console.error('❌ Failed to save achievements:', err);
+      }
       
       // Show the first new achievement
       setNewAchievement(newlyUnlocked[0]);
@@ -391,6 +397,11 @@ const MonetaPlatform = () => {
           console.log('🔍 Inferred completed lessons from XP:', inferredCompleted);
         }
 
+        // Load achievements from backend
+        const achievementsFromBackend = Array.isArray(p.unlocked_achievements) ? p.unlocked_achievements : [];
+        setUnlockedAchievements(achievementsFromBackend);
+        console.log('🏆 Loaded achievements from backend:', achievementsFromBackend);
+
         const updatedProgress = {
           ...userProgress,
           xp: p.xp,
@@ -398,8 +409,10 @@ const MonetaPlatform = () => {
           streak: p.streak,
           completedLessons: inferredCompleted,
           dailyProgress: p.daily_xp || 0,
+          perfectScores: p.perfect_scores || 0,
         };
         setUserProgress(updatedProgress);
+        
         // If backend has no completed lessons but we inferred some, persist them
         if ((p.completed_lessons?.length || 0) === 0 && inferredCompleted.length > 0) {
           console.log('💾 Backend has no completed lessons, saving inferred ones:', inferredCompleted);
@@ -420,26 +433,6 @@ const MonetaPlatform = () => {
         const storageKey = `moneta_last_streak_date_${handleId}`;
         const saved = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
         if (saved) setLastStreakDate(saved);
-        
-        // Load achievements from localStorage
-        const achievementKey = `moneta_achievements_${handleId}`;
-        const savedAchievements = typeof window !== 'undefined' ? localStorage.getItem(achievementKey) : null;
-        if (savedAchievements) {
-          try {
-            const parsed = JSON.parse(savedAchievements);
-            setUnlockedAchievements(parsed);
-          } catch (_) {}
-        }
-        
-        // Load perfect scores count
-        const perfectKey = `moneta_perfect_scores_${handleId}`;
-        const savedPerfect = typeof window !== 'undefined' ? localStorage.getItem(perfectKey) : null;
-        if (savedPerfect) {
-          try {
-            const count = parseInt(savedPerfect, 10);
-            setUserProgress(prev => ({ ...prev, perfectScores: count }));
-          } catch (_) {}
-        }
         
         // Clean up old global key (migration)
         if (typeof window !== 'undefined') {
@@ -641,24 +634,17 @@ const MonetaPlatform = () => {
         const isPerfectScore = resp.score === 1.0;
         const newPerfectScores = isPerfectScore ? userProgress.perfectScores + 1 : userProgress.perfectScores;
         
-        // Save perfect score count to localStorage
-        if (isPerfectScore) {
-          try {
-            const perfectKey = `moneta_perfect_scores_${handleId}`;
-            localStorage.setItem(perfectKey, String(newPerfectScores));
-          } catch (_) {}
-        }
-        
         // Check if we should increment streak
         const streakResult = maybeIncrementStreakForToday();
         const finalStreak = streakResult.streak;
         
-        // Persist xp/streak and completed lessons to backend
+        // Persist xp/streak, completed lessons, and perfect scores to backend
         let savedDailyXp = userProgress.dailyProgress + node.xp;
         const progressUpdate = { 
           xp: newXp, 
           streak: finalStreak, 
-          completed_lessons: updatedCompleted 
+          completed_lessons: updatedCompleted,
+          perfect_scores: newPerfectScores
         };
         
         console.log('💾 Saving progress:', progressUpdate);

@@ -13,6 +13,8 @@ class User(SQLModel, table=True):
     xp: int = Field(default=0)
     streak: int = Field(default=0)
     completed_lessons: str = Field(default="")  # Comma-separated lesson IDs
+    unlocked_achievements: str = Field(default="")  # Comma-separated achievement IDs
+    perfect_scores: int = Field(default=0)  # Count of perfect quiz scores
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: datetime = Field(default_factory=datetime.utcnow)
 
@@ -22,16 +24,6 @@ class LLMCacheRecord(SQLModel, table=True):
     prompt_hash: str = Field(index=True, unique=True)
     response_json: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class UserProgressRecord(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(index=True)
-    category: str = Field(default="all", index=True)
-    level: int = Field(default=0, index=True)
-    xp: int = Field(default=0)
-    streak: int = Field(default=0)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class XPEvent(SQLModel, table=True):

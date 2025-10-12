@@ -52,7 +52,8 @@ Complete authentication system added to Moneta with login, signup, guest mode, a
 - Old database deleted (incompatible schema)
 - New database created with auth fields
 - Progress router updated to use `username` instead of `handle`
-- User table now syncs with UserProgressRecord for xp/streak
+- User table stores all progress data (xp, streak, completed_lessons)
+- UserProgressRecord table removed (was redundant)
 
 ## Database Schema
 

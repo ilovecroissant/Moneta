@@ -95,6 +95,8 @@ class Progress(BaseModel):
     unlocked: List[str]
     completed_lessons: List[int] = []
     daily_xp: int = 0
+    unlocked_achievements: List[str] = []
+    perfect_scores: int = 0
 
 
 # --- Authentication ---
