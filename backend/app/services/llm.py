@@ -57,6 +57,10 @@ Constraints:
 - Exactly {req.num_questions} questions.
 - For every question with type "mcq": include exactly 4 options with ids A, B, C, D.
 - For every "mcq": set "correct_answer" to one of "A","B","C","D".
+- DO NOT create obvious true/false questions or questions that simply restate definitions (e.g., "Budgets help you track your income and expenses").
+- DO NOT create trivial fill-in-the-blank questions with obvious vocabulary answers (e.g., "If you earn $100 and spend $70, you have a __________ of $30").
+- Questions should test understanding, critical thinking, and practical application, not just simple arithmetic or definition recall.
+- Prefer scenario-based questions that require analysis and decision-making.
 - Tone: short, warm, Duolingo-like.
 - Explanations are one-liners.
 - Keep math simple and age-appropriate.
