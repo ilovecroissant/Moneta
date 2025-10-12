@@ -46,7 +46,16 @@ def evaluate_answers(req: EvaluateRequest) -> EvaluateResponse:
         if q.type == "mcq":
             correct = ua == ca and ca != ""
         elif q.type == "fill":
-            correct = ca != "" and (ua == ca or ca in ua or ua in ca)
+            # Use LLM to check fill-in-blank for synonym matching
+            try:
+                ok, feedback = check_free_response(q, raw_ua)
+                correct = bool(ok)
+                # Keep original explanation for fill-in-blank, just validate answer
+                explanation = q.explanation
+            except Exception:
+                # Fallback to basic string matching if LLM fails
+                correct = ca != "" and (ua == ca or ca in ua or ua in ca)
+                explanation = q.explanation
         elif q.type == "free":
             try:
                 ok, feedback = check_free_response(q, raw_ua)
