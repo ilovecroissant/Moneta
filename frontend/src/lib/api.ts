@@ -239,3 +239,220 @@ export function getLevelProgress(xp: number): number {
   const xpNeededForLevel = 100;
   return (xpInCurrentLevel / xpNeededForLevel) * 100;
 }
+
+// Get motivational quote
+export async function getMotivationalQuote(): Promise<string> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/motivational-quote`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.quote;
+  } catch (error) {
+    console.error('Motivational quote API error:', error);
+    // Return a fallback quote if the API fails
+    return 'Keep learning, keep growing! 🎯';
+  }
+}
+
+// === Friends API ===
+
+export interface FriendUser {
+  id: number;
+  username: string;
+  display_name: string;
+  xp: number;
+  streak: number;
+}
+
+export interface FriendRequest {
+  request_id: number;
+  from_user?: FriendUser;
+  to_user?: FriendUser;
+  created_at: string;
+}
+
+export interface Friend extends FriendUser {
+  friends_since: string;
+}
+
+// Search for users
+export async function searchUsers(query: string, currentUserId: number): Promise<FriendUser[]> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/friends/search?query=${encodeURIComponent(query)}&current_user_id=${currentUserId}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.users;
+  } catch (error) {
+    console.error('Search users API error:', error);
+    throw error;
+  }
+}
+
+// Send friend request
+export async function sendFriendRequest(fromUserId: number, toUserId: number): Promise<{ message: string; request_id: number }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/friends/request`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from_user_id: fromUserId, to_user_id: toUserId }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = typeof errorData.detail === 'string' 
+        ? errorData.detail 
+        : JSON.stringify(errorData.detail) || `HTTP error! status: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Send friend request API error:', error);
+    throw error;
+  }
+}
+
+// Get friend requests
+export async function getFriendRequests(userId: number): Promise<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/friends/requests/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Get friend requests API error:', error);
+    throw error;
+  }
+}
+
+// Accept friend request
+export async function acceptFriendRequest(requestId: number): Promise<{ message: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/friends/requests/${requestId}/accept`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Accept friend request API error:', error);
+    throw error;
+  }
+}
+
+// Reject friend request
+export async function rejectFriendRequest(requestId: number): Promise<{ message: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/friends/requests/${requestId}/reject`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Reject friend request API error:', error);
+    throw error;
+  }
+}
+
+// Get friends list
+export async function getFriends(userId: number): Promise<Friend[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/friends/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.friends;
+  } catch (error) {
+    console.error('Get friends API error:', error);
+    throw error;
+  }
+}
+
+// Get friends count
+export async function getFriendsCount(userId: number): Promise<number> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/friends/${userId}/count`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.count;
+  } catch (error) {
+    console.error('Get friends count API error:', error);
+    throw error;
+  }
+}
+
+// Remove friend
+export async function removeFriend(userId: number, friendId: number): Promise<{ message: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/friends/${userId}?friend_id=${friendId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Remove friend API error:', error);
+    throw error;
+  }
+}
+
+// === Daily XP History API ===
+
+export interface DailyXPDataPoint {
+  timestamp: string;
+  xp: number;
+}
+
+export interface DailyXPHistory {
+  handle: string;
+  data: DailyXPDataPoint[];
+  total_xp: number;
+}
+
+// Get daily XP history
+export async function getDailyXPHistory(handle: string, days: number = 7): Promise<DailyXPHistory> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/progress/${handle}/daily-xp?days=${days}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Get daily XP history API error:', error);
+    throw error;
+  }
+}

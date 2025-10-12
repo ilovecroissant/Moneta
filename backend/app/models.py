@@ -51,3 +51,28 @@ class PasswordResetToken(SQLModel, table=True):
     expires_at: datetime  # Token expiration (e.g., 1 hour)
     used: bool = Field(default=False)  # Mark as used after password reset
 
+
+class FriendRequest(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    from_user_id: int = Field(index=True)  # User who sent the request
+    to_user_id: int = Field(index=True)  # User who receives the request
+    status: str = Field(default="pending")  # pending, accepted, rejected
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Friendship(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id_1: int = Field(index=True)  # First user
+    user_id_2: int = Field(index=True)  # Second user
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DailyXPLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    date: datetime = Field(index=True)  # Date of the XP log
+    xp_earned: int = Field(default=0)  # Total XP earned on this date
+    hour: int = Field(default=0)  # Hour of the day (0-23)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .db import init_db
-from .routers import lessons, chat, progress, auth
+from .routers import lessons, chat, progress, auth, friends
 
 app = FastAPI(title="Moneta API")
 
@@ -29,4 +29,5 @@ app.include_router(lessons.router)
 app.include_router(chat.router)
 app.include_router(progress.router)
 app.include_router(auth.router)
+app.include_router(friends.router)
 

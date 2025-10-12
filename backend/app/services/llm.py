@@ -144,3 +144,40 @@ def check_free_response(question: Question, user_answer: str) -> Tuple[bool, str
     except Exception:
         return False, "Couldn't check your answer. Try again with a clearer response."
 
+
+def generate_motivational_quote() -> str:
+    """Generate a short, motivational personal finance quote for teens."""
+    # Fallback quotes in case API fails
+    fallback_quotes = [
+        "Save today, enjoy tomorrow! 💰",
+        "Small savings add up to big dreams! ✨",
+        "Your credit score opens doors! 🚪",
+        "Budget smart, live better! 📊",
+        "Invest in your future self! 🌟",
+        "Every penny counts! 💵",
+        "Build wealth, one step at a time! 🎯",
+        "Smart spending leads to big savings! 🧠",
+        "Your financial goals are within reach! 🎉",
+        "Start saving now, thank yourself later! 🙏",
+    ]
+    
+    try:
+        model = _ensure_model()
+        prompt = (
+            "Generate a short, motivational quote about personal finance for teens. "
+            "Focus on topics like savings, credit, budgeting, investing, or financial goals. "
+            "Keep it under 12 words, friendly, and encouraging. "
+            "Return ONLY the quote text without any quotation marks or extra formatting. "
+            "Examples: 'Save today, enjoy tomorrow', 'Small savings add up to big dreams', "
+            "'Your credit score opens doors', 'Budget smart, live better'."
+        )
+        resp = model.generate_content(prompt)
+        quote = (getattr(resp, "text", "") or "").strip()
+        # Remove any quotation marks if present
+        quote = quote.strip('"').strip("'").strip()
+        return quote if quote else fallback_quotes[0]
+    except Exception:
+        # If API fails, return a random fallback quote
+        import random
+        return random.choice(fallback_quotes)
+

@@ -4,7 +4,7 @@ from sqlmodel import select
 from datetime import datetime, timedelta
 
 from ..db import get_session
-from ..models import User, XPEvent
+from ..models import User, XPEvent, DailyXPLog
 from ..schemas import Progress
 
 
@@ -148,5 +148,46 @@ def set_progress(handle: str, body: ProgressUpdate) -> Progress:
         unlocked_achievements=unlocked_achievements,
         perfect_scores=user_db.perfect_scores,
     )
+
+
+@router.get("/{handle}/daily-xp")
+def get_daily_xp_history(handle: str, days: int = 7):
+    """Get daily XP history for the past N days"""
+    user = _get_or_create_user(handle)
+    
+    # Calculate date range
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    with get_session() as session:
+        # Get XP events for the date range
+        events = session.exec(
+            select(XPEvent).where(
+                XPEvent.user_id == user.id,
+                XPEvent.created_at >= start_date,
+                XPEvent.created_at <= end_date
+            ).order_by(XPEvent.created_at)
+        ).all()
+        
+        # Group by hour
+        hourly_data = {}
+        for event in events:
+            # Create hour key (date + hour)
+            hour_key = event.created_at.replace(minute=0, second=0, microsecond=0).isoformat()
+            if hour_key not in hourly_data:
+                hourly_data[hour_key] = 0
+            hourly_data[hour_key] += event.xp_delta
+        
+        # Convert to list format
+        data_points = [
+            {"timestamp": key, "xp": value}
+            for key, value in sorted(hourly_data.items())
+        ]
+        
+        return {
+            "handle": handle,
+            "data": data_points,
+            "total_xp": sum(hourly_data.values())
+        }
 
 

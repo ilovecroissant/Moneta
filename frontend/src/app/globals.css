@@ -392,11 +392,6 @@ body {
   transform: scale(0.95);
 }
 
-/* Achievement badge pop */
-.achievement-pop {
-  animation: success-burst 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
 /* ===== DUOLINGO TYPOGRAPHY SYSTEM ===== */
 
 /* Feather Bold substitute - for headlines (using Nunito ExtraBold/Black) */

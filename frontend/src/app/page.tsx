@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, BookOpen, Send, X, Zap } from 'lucide-react';
+import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, BookOpen, Send, X, Zap, User } from 'lucide-react';
 import {
   chat as chatApi,
   generateLesson,
@@ -12,6 +12,7 @@ import {
   type Lesson as ApiLesson,
   type EvaluateResponse,
   calculateLevel,
+  getMotivationalQuote,
 } from '@/lib/api';
 import { checkFree, type FreeCheckResponse } from '@/lib/api';
 
@@ -297,6 +298,7 @@ const MonetaPlatform = () => {
   const [lastStreakDate, setLastStreakDate] = useState<string | null>(null);
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [newStreakValue, setNewStreakValue] = useState(0);
+  const [motivationalQuote, setMotivationalQuote] = useState('Keep it up! 🎯');
   
   // Achievements state
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
@@ -443,6 +445,27 @@ const MonetaPlatform = () => {
       } catch (_) {}
     })();
   }, [userData?.username, handleId]); // Re-run when user changes
+
+  // Rotate motivational quotes every 5 seconds
+  useEffect(() => {
+    const fetchNewQuote = async () => {
+      try {
+        const quote = await getMotivationalQuote();
+        setMotivationalQuote(quote);
+      } catch (error) {
+        console.error('Failed to fetch motivational quote:', error);
+        // Keep the current quote if fetch fails
+      }
+    };
+
+    // Fetch initial quote
+    fetchNewQuote();
+
+    // Set up interval to fetch new quotes
+    const interval = setInterval(fetchNewQuote, 5000); // 5 seconds
+
+    return () => clearInterval(interval);
+  }, []); // Run once on mount and set up interval
 
   // Lessons path (visual nodes). Content is generated via backend when opened
   const lessons = [
@@ -693,8 +716,8 @@ const MonetaPlatform = () => {
     <div className="space-y-8 relative">
       {/* Hero Section */}
       <div className="text-center py-8">
-        <h2 className="text-4xl font-black text-gray-800 dark:text-gray-100 mb-2">
-          Keep it up! 🎯
+        <h2 className="text-4xl font-black text-gray-800 dark:text-gray-100 mb-2 transition-opacity duration-500">
+          {motivationalQuote}
         </h2>
         <p className="text-gray-600 dark:text-gray-300 text-lg">You're on a {userProgress.streak} day streak!</p>
       </div>
@@ -756,7 +779,7 @@ const MonetaPlatform = () => {
                 key={achievement.id}
                 className={`text-center p-4 rounded-2xl border-2 transition-all ${
                   isUnlocked 
-                    ? 'duo-card bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200 achievement-pop anim-card-lift' 
+                    ? 'duo-card bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200 anim-card-lift' 
                     : 'bg-gray-100 border-gray-200 opacity-60'
                 }`}
               >
@@ -1272,11 +1295,12 @@ const MonetaPlatform = () => {
                 <span className="font-black text-amber-700 dark:text-amber-100">{userProgress.xp}</span>
               </div>
               <button
-                onClick={handleLogout}
-                className="ml-2 px-4 py-2 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transform transition-all hover:scale-105 border-b-4 border-red-700"
-                style={{ boxShadow: '0 4px 0 #b91c1c, 0 6px 12px rgba(220, 38, 38, 0.4)' }}
+                onClick={() => router.push('/profile')}
+                className="ml-2 w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold rounded-full hover:from-blue-600 hover:to-purple-700 transform transition-all hover:scale-110 border-b-4 border-purple-700 flex items-center justify-center"
+                style={{ boxShadow: '0 4px 0 #6b21a8, 0 6px 12px rgba(147, 51, 234, 0.4)' }}
+                title="View Profile"
               >
-                Logout
+                <User className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -1407,8 +1431,8 @@ const MonetaPlatform = () => {
       {showAchievementModal && newAchievement && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm">
           <div className="bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 rounded-3xl p-12 shadow-2xl max-w-md mx-4 text-center">
-            {/* Trophy Icon */}
-            <div className="text-8xl mb-6 animate-bounce">
+            {/* Trophy Icon - removed bounce animation */}
+            <div className="text-8xl mb-6">
               {newAchievement.icon}
             </div>
             
