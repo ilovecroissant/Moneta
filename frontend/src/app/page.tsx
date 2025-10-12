@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, BookOpen, Send, X, Zap, Target } from 'lucide-react';
+import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, BookOpen, Send, X, Zap } from 'lucide-react';
 import {
   chat as chatApi,
   generateLesson,
@@ -344,6 +344,18 @@ const MonetaPlatform = () => {
     }
   ];
 
+  // Cumulative unlock XP per lesson: each lesson unlocks when total earned XP
+  // reaches the sum of XP of all prior lessons
+  const lessonUnlockXPById = useMemo(() => {
+    let cumulative = 0;
+    const map = new Map<number, number>();
+    for (const l of lessons) {
+      map.set(l.id, cumulative);
+      cumulative += l.xp;
+    }
+    return map;
+  }, [lessons]);
+
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
     const message = chatInput.trim();
@@ -369,7 +381,9 @@ const MonetaPlatform = () => {
 
   const openLesson = async (lessonId: number) => {
     const node = lessons.find((l) => l.id === lessonId);
-    if (!node || node.locked) return;
+    if (!node) return;
+    const unlockXp = lessonUnlockXPById.get(node.id) || 0;
+    if (userProgress.xp < unlockXp) return;
     setSelectedLesson(lessonId);
     setGeneratedLesson(null);
     setUserAnswers({});
@@ -480,7 +494,6 @@ const MonetaPlatform = () => {
       <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Target className="w-6 h-6 text-amber-500" />
             <span className="font-bold text-gray-800">Daily Goal</span>
           </div>
           <span className="text-sm font-bold text-gray-600">
@@ -510,8 +523,7 @@ const MonetaPlatform = () => {
         </div>
       </div>
 
-      {/* Micro Simulation */}
-      <MicroSimulation />
+      {/* Micro Simulation (removed) */}
 
       {/* Achievements */}
       <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
@@ -552,20 +564,20 @@ const MonetaPlatform = () => {
         <div className="relative">
           {(() => {
             const firstAccessibleIndex = lessons.findIndex((l) => {
-              const reqLevel = l.difficulty || 1;
-              const meetsLvl = userProgress.level >= reqLevel;
               const completed = userProgress.completedLessons.includes(l.id);
-              return !completed && meetsLvl;
+              const unlockXp = lessonUnlockXPById.get(l.id) || 0;
+              const meetsXp = userProgress.xp >= unlockXp;
+              return !completed && meetsXp;
             });
             return lessons.map((lesson, index) => {
               const isCompleted = userProgress.completedLessons.includes(lesson.id);
-              const requiredLevel = lesson.difficulty || 1;
-              const meetsLevel = userProgress.level >= requiredLevel;
-              const isPrimaryNext = !isCompleted && meetsLevel && index === firstAccessibleIndex;
-              const isLocked = !isCompleted && (!meetsLevel || !isPrimaryNext);
+              const requiredLevel = lesson.difficulty || 1; // still used for display/LLM level
+              const unlockXp = lessonUnlockXPById.get(lesson.id) || 0;
+              const meetsXp = userProgress.xp >= unlockXp;
+              const isPrimaryNext = !isCompleted && meetsXp && index === firstAccessibleIndex;
+              const isLocked = !isCompleted && !meetsXp;
               const isNext = isPrimaryNext;
-              const requiredXP = Math.max(0, (requiredLevel - 1) * 100);
-              const neededXP = Math.max(0, requiredXP - userProgress.xp);
+              const neededXP = Math.max(0, unlockXp - userProgress.xp);
               
               return (
                 <div
@@ -632,7 +644,7 @@ const MonetaPlatform = () => {
                         </div>
                         <div className="flex items-center justify-center gap-2 text-xs">
                           <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold">
-                            {neededXP > 0 ? `Needs ${neededXP} XP` : 'Ready'}
+                            {isCompleted ? 'Complete' : isLocked ? `Needs ${neededXP} XP` : 'Ready'}
                           </span>
                           {isLocked && (
                             <span className="text-gray-500 font-semibold">🔒 Locked</span>
@@ -1137,16 +1149,6 @@ const MonetaPlatform = () => {
   );
 };
 
-// Simple micro-simulation widget
-const MicroSimulation = () => {
-  const [amount, setAmount] = React.useState<number>(50);
-  const [years, setYears] = React.useState<number>(5);
-  const [rate, setRate] = React.useState<number>(8);
-
-  const monthlyRate = rate / 100 / 12;
-  const months = years * 12;
-  const future = amount * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
-
-};
+// MicroSimulation removed
 
 export default MonetaPlatform;
