@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, BookOpen, Send, X, Zap, Target } from 'lucide-react';
 import {
   chat as chatApi,
@@ -105,7 +106,12 @@ const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegiste
 
 QuestionInput.displayName = 'QuestionInput';
 
-const FinLitPlatform = () => {
+const MonetaPlatform = () => {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
+  const [isGuest, setIsGuest] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<number | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: 'ai' | 'user'; text: string }[]>([
@@ -117,6 +123,25 @@ const FinLitPlatform = () => {
   // Lesson + quiz state (driven by backend)
   const [generatedLesson, setGeneratedLesson] = useState<ApiLesson | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(false);
+
+  // Auth check on mount
+  useEffect(() => {
+    setIsMounted(true);
+    const authToken = localStorage.getItem('authToken');
+    const isGuestMode = localStorage.getItem('isGuest') === 'true';
+    const savedUserData = localStorage.getItem('userData');
+    
+    if (!authToken && !isGuestMode) {
+      router.push('/login');
+      return;
+    }
+    
+    setIsAuthenticated(true);
+    setIsGuest(isGuestMode);
+    if (savedUserData) {
+      setUserData(JSON.parse(savedUserData));
+    }
+  }, [router]);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({}); // key: question_id → answer (e.g., 'A' for mcq)
   const [evaluation, setEvaluation] = useState<EvaluateResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -131,8 +156,8 @@ const FinLitPlatform = () => {
   const wrongAudioRef = useRef<HTMLAudioElement | null>(null);
   const [questionEvaluatedMap, setQuestionEvaluatedMap] = useState<Record<string, boolean>>({});
 
-  // Basic demo handle for progress
-  const handleId = 'demo';
+  // Get user handle from authenticated user data
+  const handleId = userData?.username || 'demo';
 
   // User progress data (xp/streak from backend; daily fields are UI-only)
   const [userProgress, setUserProgress] = useState({
@@ -157,7 +182,7 @@ const FinLitPlatform = () => {
       }
       const updatedStreak = userProgress.streak + 1;
       await setProgress(handleId, { xp: newXp, streak: updatedStreak });
-      try { localStorage.setItem('finlit_last_streak_date', key); } catch (_) {}
+      try { localStorage.setItem('moneta_last_streak_date', key); } catch (_) {}
       setLastStreakDate(key);
       return { streak: updatedStreak, lastDate: key };
     } catch (_) {
@@ -166,6 +191,9 @@ const FinLitPlatform = () => {
   };
 
   useEffect(() => {
+    // Skip loading progress for guest users
+    if (!userData?.username || isGuest) return;
+    
     (async () => {
       try {
         const p = await getProgress(handleId);
@@ -179,11 +207,11 @@ const FinLitPlatform = () => {
         // best-effort: keep defaults when backend not available
       }
       try {
-        const saved = typeof window !== 'undefined' ? localStorage.getItem('finlit_last_streak_date') : null;
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('moneta_last_streak_date') : null;
         if (saved) setLastStreakDate(saved);
       } catch (_) {}
     })();
-  }, []);
+  }, [userData?.username]); // Re-run when user changes
 
   // Lessons path (visual nodes). Content is generated via backend when opened
   const lessons = [
@@ -292,6 +320,13 @@ const FinLitPlatform = () => {
     } finally {
       setLoadingChat(false);
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userData');
+    localStorage.removeItem('isGuest');
+    router.push('/login');
   };
 
   const openLesson = async (lessonId: number) => {
@@ -836,6 +871,18 @@ const FinLitPlatform = () => {
     );
   };
 
+  // Show loading state while checking authentication
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">💰</div>
+          <div className="text-2xl font-bold text-gray-700">Loading Moneta...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       {/* Audio elements */}
@@ -857,8 +904,18 @@ const FinLitPlatform = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-blue-600">
-                💰 FinLit
+                💰 Moneta
               </div>
+              {userData && (
+                <div className="text-sm font-semibold text-gray-600">
+                  Welcome, {userData.display_name || userData.username}!
+                </div>
+              )}
+              {isMounted && isGuest && (
+                <div className="text-sm font-semibold text-gray-500">
+                  (Guest Mode - Progress won&apos;t save)
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 bg-orange-100 px-4 py-2 rounded-xl border-2 border-orange-200">
@@ -869,6 +926,12 @@ const FinLitPlatform = () => {
                 <Zap className="w-5 h-5 text-amber-600" />
                 <span className="font-black text-amber-700">{userProgress.xp}</span>
               </div>
+              <button
+                onClick={handleLogout}
+                className="ml-2 px-4 py-2 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition-colors"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
@@ -1021,4 +1084,4 @@ const MicroSimulation = () => {
   );
 };
 
-export default FinLitPlatform;
+export default MonetaPlatform;

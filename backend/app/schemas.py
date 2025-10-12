@@ -94,3 +94,54 @@ class Progress(BaseModel):
     streak: int
     unlocked: List[str]
 
+
+# --- Authentication ---
+class UserRegister(BaseModel):
+    username: str
+    email: str  # Required for password reset
+    password: str
+
+
+class UserLogin(BaseModel):
+    username_or_email: str  # Can be username or email
+    password: str
+
+
+class GoogleAuthRequest(BaseModel):
+    google_token: str  # Google OAuth ID token
+
+
+class AuthResponse(BaseModel):
+    user_id: int
+    username: str
+    email: Optional[str]
+    display_name: Optional[str]
+    xp: int
+    streak: int
+    token: str  # Simple session token
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: Optional[str]
+    display_name: Optional[str]
+    xp: int
+    streak: int
+
+
+class PasswordResetRequest(BaseModel):
+    email: str  # User provides email to request reset
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str  # Reset token from email
+    new_password: str  # New password to set
+
+
+class PasswordResetResponse(BaseModel):
+    message: str
+    email: Optional[str] = None  # Return email for confirmation (in dev mode)
+    token: Optional[str] = None  # Return token for testing (in dev mode only!)
+
+

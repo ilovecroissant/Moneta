@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .db import init_db
-from .routers import lessons, chat, progress
+from .routers import lessons, chat, progress, auth
 
-app = FastAPI(title="Finance Learning API")
+app = FastAPI(title="Moneta API")
 
 allowed_origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
 app.add_middleware(
@@ -28,4 +28,5 @@ def _startup() -> None:
 app.include_router(lessons.router)
 app.include_router(chat.router)
 app.include_router(progress.router)
+app.include_router(auth.router)
 

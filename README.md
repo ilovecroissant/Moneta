@@ -1,4 +1,4 @@
-# Finance Learning App (React + FastAPI + Gemini)
+# Moneta - AI-Powered Financial Literacy Platform
 
 Monorepo with `frontend/` (Next.js + Tailwind) and `backend/` (FastAPI + SQLModel + SQLite). AI via Google Gemini (Google AI Studio API key). Backend deploy on Railway (persistent volume), frontend on Vercel.
 
