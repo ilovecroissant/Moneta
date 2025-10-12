@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Allow tracking of frontend/src/lib despite generic lib/ ignore
+!frontend/src/lib/
+!frontend/src/lib/**

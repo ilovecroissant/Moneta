@@ -113,6 +113,7 @@ const FinLitPlatform = () => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const liveAnswersRef = useRef<Record<string, string>>({});
+  const [questionCorrectMap, setQuestionCorrectMap] = useState<Record<string, boolean>>({});
 
   // Basic demo handle for progress
   const handleId = 'demo';
@@ -285,6 +286,7 @@ const FinLitPlatform = () => {
     setUserAnswers({});
     setEvaluation(null);
     setCurrentQuestionIdx(0);
+    setQuestionCorrectMap({});
     setLoadingLesson(true);
     try {
       const category = CATEGORY_MAP[node.category] || node.category;
@@ -612,6 +614,7 @@ const FinLitPlatform = () => {
                                 setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
                               let isCorrect = false;
                               const proceed = (ok: boolean, message?: string) => {
+                                setQuestionCorrectMap((prev) => ({ ...prev, [q.id]: ok }));
                                 if (ok) {
                                   setCheckMessage(message || '✅ Correct!');
                                   setTimeout(() => {
@@ -635,6 +638,7 @@ const FinLitPlatform = () => {
                                 // free text -> LLM check
                                 if (!uaRaw) {
                                   setCheckMessage('❌ Please enter an answer.');
+                                  setQuestionCorrectMap((prev) => ({ ...prev, [q.id]: false }));
                                   return;
                                 }
                                 setCheckingFree(true);
@@ -659,17 +663,15 @@ const FinLitPlatform = () => {
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               const idxAtClick = currentQuestionIdx;
-                              // Only allow next if correct answer is present and matches
-                              const ca = (q.correct_answer || '').trim();
-                              if (!ca && q.type !== 'free') return; // require correct answers for non-free
-                              const ua = (liveAnswersRef.current[q.id] ?? userAnswers[q.id] ?? '').trim();
-                              const allow = q.type === 'mcq' ? ua.toUpperCase() === ca.toUpperCase() : (q.type === 'fill' ? ua.length > 0 && ca.length > 0 : !!ua);
-                              if (allow) {
+                              // Only allow next if this question is marked correct via CHECK
+                              if (questionCorrectMap[q.id]) {
                                 setCheckMessage(null);
                                 setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
+                              } else {
+                                setCheckMessage('❌ Please check your answer first.');
                               }
                             }}
-                            disabled={currentQuestionIdx >= totalQuestions - 1 || checkingFree}
+                            disabled={currentQuestionIdx >= totalQuestions - 1 || checkingFree || !questionCorrectMap[q.id]}
                             className="px-6 bg-gray-100 text-gray-700 font-bold rounded-2xl border-2 border-gray-200 hover:bg-gray-200 disabled:opacity-50"
                           >
                             NEXT
