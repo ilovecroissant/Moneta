@@ -176,8 +176,8 @@ const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegiste
             type="button"
             className={`w-full text-left p-5 rounded-2xl border-2 font-semibold text-lg transition-colors ${
               value === opt.id
-                ? 'border-sky-500 bg-sky-50 text-gray-900 shadow-lg'
-                : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50'
+                ? 'border-sky-500 bg-sky-50 dark:bg-sky-900 text-gray-900 dark:text-gray-100 shadow-lg'
+                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >
             {opt.text}
@@ -195,7 +195,7 @@ const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegiste
         onChange={(e) => { const v = e.target.value; setLocalValue(v); onLiveChange && onLiveChange(v); }}
         onBlur={handleBlur}
         placeholder="Type your answer"
-        className="w-full border-2 border-gray-300 rounded-2xl px-4 py-4 font-semibold text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+        className="w-full border-2 border-gray-300 dark:border-gray-600 rounded-2xl px-4 py-4 font-semibold text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-gray-800 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
         autoComplete="off"
         spellCheck={false}
       />
@@ -217,7 +217,7 @@ const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegiste
           onChange(val);
         }}
         placeholder="Explain in your own words..."
-        className="w-full border-2 border-gray-300 rounded-2xl px-4 py-4 font-semibold text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+        className="w-full border-2 border-gray-300 dark:border-gray-600 rounded-2xl px-4 py-4 font-semibold text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-gray-800 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
         rows={4}
         autoComplete="off"
         spellCheck={false}
@@ -690,26 +690,26 @@ const MonetaPlatform = () => {
   };
 
   const DashboardView = () => (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
       {/* Hero Section */}
       <div className="text-center py-8">
-        <h2 className="text-4xl font-black text-gray-800 mb-2">
+        <h2 className="text-4xl font-black text-gray-800 dark:text-gray-100 mb-2">
           Keep it up! 🎯
         </h2>
-        <p className="text-gray-600 text-lg">You're on a {userProgress.streak} day streak!</p>
+        <p className="text-gray-600 dark:text-gray-300 text-lg">You're on a {userProgress.streak} day streak!</p>
       </div>
 
       {/* Daily Goal Progress */}
-      <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
+      <div className="duo-card p-6 anim-card-lift">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-gray-800">Daily Goal</span>
+            <span className="font-bold text-gray-800 dark:text-gray-100">Daily Goal</span>
           </div>
-          <span className="text-sm font-bold text-gray-600">
+          <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
             {userProgress.dailyProgress}/{userProgress.dailyGoal} XP
           </span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
           <div 
             className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500"
             style={{ width: `${Math.min((userProgress.dailyProgress / userProgress.dailyGoal) * 100, 100)}%` }}
@@ -719,25 +719,25 @@ const MonetaPlatform = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-amber-400 to-amber-500 rounded-3xl p-6 text-white shadow-lg">
-          <Flame className="w-10 h-10 mb-3" />
-          <div className="text-3xl font-black mb-1">{userProgress.streak}</div>
-          <div className="text-amber-100 text-sm font-semibold">Day Streak</div>
+        <div className="bg-gradient-to-br from-amber-400 to-amber-500 p-6 text-white anim-card-lift rounded-3xl border-4 border-amber-300 shadow-lg" style={{ boxShadow: '0 6px 0 #f59e0b, 0 10px 20px rgba(245, 158, 11, 0.4)' }}>
+          <Flame className="w-10 h-10 mb-3 streak-flame" />
+          <div className="text-3xl font-black mb-1 drop-shadow-md">{userProgress.streak}</div>
+          <div className="text-white text-sm font-bold drop-shadow-sm">Day Streak</div>
         </div>
         
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl p-6 text-white shadow-lg">
-          <Zap className="w-10 h-10 mb-3" />
-          <div className="text-3xl font-black mb-1">{userProgress.xp}</div>
-          <div className="text-blue-100 text-sm font-semibold">Total XP</div>
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white anim-card-lift rounded-3xl border-4 border-blue-400 shadow-lg" style={{ boxShadow: '0 6px 0 #2563eb, 0 10px 20px rgba(37, 99, 235, 0.4)' }}>
+          <Zap className="w-10 h-10 mb-3 anim-float-delayed" />
+          <div className="text-3xl font-black mb-1 drop-shadow-md">{userProgress.xp}</div>
+          <div className="text-white text-sm font-bold drop-shadow-sm">Total XP</div>
         </div>
       </div>
 
       {/* Micro Simulation (removed) */}
 
       {/* Achievements */}
-      <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
+      <div className="duo-card p-6 anim-card-lift">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-black text-gray-800 flex items-center gap-2">
+          <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 flex items-center gap-2">
             <Trophy className="w-6 h-6 text-amber-500" />
             Achievements ({unlockedAchievements.length}/{ACHIEVEMENTS.length})
           </h3>
@@ -756,7 +756,7 @@ const MonetaPlatform = () => {
                 key={achievement.id}
                 className={`text-center p-4 rounded-2xl border-2 transition-all ${
                   isUnlocked 
-                    ? 'bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200 scale-100' 
+                    ? 'duo-card bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200 achievement-pop anim-card-lift' 
                     : 'bg-gray-100 border-gray-200 opacity-60'
                 }`}
               >
@@ -791,15 +791,6 @@ const MonetaPlatform = () => {
 
       {/* Learning Path - Duolingo Style */}
       <div className="relative min-h-screen pb-20">
-        <div className="absolute inset-0" style={{
-          background: 'linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%)'
-        }}>
-          {/* Decorative circles */}
-          <div className="absolute top-10 right-10 w-20 h-20 bg-yellow-200 rounded-full opacity-30 blur-xl"></div>
-          <div className="absolute top-40 left-10 w-32 h-32 bg-green-200 rounded-full opacity-20 blur-xl"></div>
-          <div className="absolute bottom-40 right-20 w-24 h-24 bg-blue-200 rounded-full opacity-25 blur-xl"></div>
-        </div>
-
         {/* Vertical Path Line */}
         <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-green-300 via-blue-300 to-purple-300 opacity-30 transform -translate-x-1/2"></div>
 
@@ -839,26 +830,30 @@ const MonetaPlatform = () => {
                     onClick={() => !isLocked && openLesson(lesson.id)}
                     type="button"
                     disabled={isLocked}
-                    className={`relative group transition-all duration-300 ${
-                      isLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-110'
+                    className={`lesson-node transform-3d ${
+                      isLocked ? 'cursor-not-allowed' : 'cursor-pointer'
                     }`}
                   >
                     {/* Lesson Circle */}
-                    <div className={`relative w-20 h-20 rounded-full flex items-center justify-center text-4xl shadow-lg border-4 transition-all ${
+                    <div className={`lesson-icon-3d relative w-20 h-20 rounded-full flex items-center justify-center text-4xl border-4 transition-all overflow-visible ${
                       isLocked
-                        ? 'bg-gray-300 border-gray-400'
+                        ? 'bg-gray-300 border-gray-400 lesson-icon-locked'
                         : isCompleted
-                        ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-600 anim-pop-in'
+                        ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-600 lesson-icon-completed'
                         : isNext
-                        ? 'bg-gradient-to-br ' + lesson.color + ' border-white anim-bounce anim-pulse-ring'
-                        : 'bg-white border-gray-300'
+                        ? 'bg-gradient-to-br ' + lesson.color + ' border-white lesson-icon-active anim-float'
+                        : 'bg-white border-gray-300 lesson-icon-available'
                     }`}>
+                      {/* Shine overlay */}
+                      {!isLocked && <div className="lesson-shine"></div>}
+                      
+                      {/* Icon content */}
                       {isLocked ? (
-                        <Lock className="w-8 h-8 text-gray-500" />
+                        <Lock className="w-8 h-8 text-gray-500 lesson-character" />
                       ) : isCompleted ? (
-                        <CheckCircle className="w-10 h-10 text-white" />
+                        <CheckCircle className="w-10 h-10 text-white lesson-character" />
                       ) : (
-                        <span>{lesson.icon}</span>
+                        <span className="lesson-character">{lesson.icon}</span>
                       )}
                       
                       {/* Glow effect for next lesson */}
@@ -900,16 +895,6 @@ const MonetaPlatform = () => {
             });
           })()}
         </div>
-
-        {/* Bottom Trophy */}
-        <div className="text-center pt-10">
-          <div className="inline-block bg-gradient-to-br from-amber-400 to-amber-500 rounded-full p-6 shadow-xl">
-            <Trophy className="w-16 h-16 text-white" />
-          </div>
-          <div className="mt-4 font-black text-2xl text-gray-700">
-            Complete all lessons!
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -934,20 +919,30 @@ const MonetaPlatform = () => {
     return (
       <div className="max-w-2xl mx-auto">
         {/* Progress Bar */}
-        <div className="bg-white rounded-full h-4 mb-6 overflow-hidden shadow-inner">
+        <div className="bg-white dark:bg-gray-700 rounded-full h-4 mb-6 overflow-hidden shadow-inner">
           <div 
             className="h-full bg-gradient-to-r from-green-400 to-green-500 transition-all duration-300"
             style={{ width: `${progressWidth}%` }}
           />
         </div>
 
-        <div className="bg-white rounded-3xl p-8 shadow-2xl border-2 border-gray-100">
+        <div className="duo-card p-8 anim-bounce-in">
           {!evaluation ? (
             <>
               <div className="text-center mb-8">
-                <div className="text-6xl mb-4">{node.icon}</div>
-                <h2 className="text-3xl font-black text-gray-800 mb-2">{generatedLesson?.title || node.title}</h2>
-                <p className="text-gray-600 font-semibold">{generatedLesson?.category || node.category}</p>
+                <div className="inline-block relative">
+                  <div 
+                    className="lesson-icon-3d lesson-icon-active w-32 h-32 rounded-full flex items-center justify-center text-6xl border-6 border-white bg-gradient-to-br from-green-400 to-green-500 mb-4"
+                    style={{ 
+                      boxShadow: '0 8px 0 #22c55e, 0 12px 30px rgba(34, 197, 94, 0.4), 0 0 40px rgba(88, 204, 2, 0.3), inset 0 -4px 8px rgba(0, 0, 0, 0.2), inset 0 4px 8px rgba(255, 255, 255, 0.4)' 
+                    }}
+                  >
+                    <div className="lesson-shine"></div>
+                    <span className="lesson-character anim-float">{node.icon}</span>
+                  </div>
+                </div>
+                <h2 className="text-3xl font-black text-gray-800 dark:text-gray-100 mb-2">{generatedLesson?.title || node.title}</h2>
+                <p className="text-gray-600 dark:text-gray-300 font-semibold">{generatedLesson?.category || node.category}</p>
               </div>
 
               {loadingLesson ? (
@@ -969,7 +964,7 @@ const MonetaPlatform = () => {
                           </div>
                         )}
                         <div className="flex items-center justify-between">
-                          <h3 className="text-2xl font-bold text-gray-800 leading-snug">{q.prompt}</h3>
+                          <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-snug">{q.prompt}</h3>
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-gray-500">{currentQuestionIdx + 1}/{totalQuestions}</span>
                             {questionEvaluatedMap[qKey] && (
@@ -1084,9 +1079,14 @@ const MonetaPlatform = () => {
                                     });
                                 }
                               }}
-                              className={`flex-1 text-white font-black py-4 rounded-2xl transition-colors shadow-md disabled:opacity-50 ${
-                                checkMessage && checkMessage.startsWith('❌') ? 'bg-rose-500 hover:bg-rose-600' : 'bg-sky-600 hover:bg-sky-700'
+                              className={`duo-btn flex-1 py-4 disabled:opacity-50 ${
+                                checkMessage && checkMessage.startsWith('❌') ? 'bg-red-500 border-red-700' : ''
                               }`}
+                              style={checkMessage && checkMessage.startsWith('❌') ? {
+                                background: 'var(--duolingo-red)',
+                                borderBottom: '4px solid #cc3030',
+                                boxShadow: '0 4px 0 #cc3030'
+                              } : {}}
                               disabled={checkingFree}
                             >
                               {checkingFree ? 'CHECKING…' : 'CHECK'}
@@ -1102,7 +1102,7 @@ const MonetaPlatform = () => {
                                 setCheckMessage(null);
                                 setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
                               }}
-                              className="w-full bg-green-600 text-white text-xl py-5 font-bold rounded-2xl hover:bg-green-700 transition-colors shadow-md"
+                              className="duo-btn w-full text-xl py-5 anim-success-burst"
                             >
                               NEXT
                             </button>
@@ -1124,7 +1124,7 @@ const MonetaPlatform = () => {
                         onClick={submitQuiz}
                         disabled={!generatedLesson || !canFinish || isSubmitting || checkingFree}
                         type="button"
-                        className="mt-6 w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-black text-xl py-5 rounded-2xl hover:from-green-600 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed confetti"
+                        className="duo-btn btn-shimmer mt-6 w-full text-xl py-6 disabled:opacity-50 disabled:cursor-not-allowed confetti"
                       >
                         {isSubmitting ? 'CHECKING...' : 'FINISH' }
                       </button>
@@ -1232,7 +1232,7 @@ const MonetaPlatform = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-slate-900">
       {/* Audio elements */}
       <audio ref={correctAudioRef} src="/success.mp3" preload="auto" />
       <audio ref={wrongAudioRef} src="/wrong.mp3" preload="auto" />
@@ -1247,7 +1247,7 @@ const MonetaPlatform = () => {
       )}
 
       {/* Header - Duolingo Style */}
-      <header className="bg-white border-b-2 border-gray-200 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white dark:bg-gray-900 border-b-2 border-gray-200 dark:border-gray-700 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
@@ -1255,28 +1255,29 @@ const MonetaPlatform = () => {
                 💰 Moneta
               </div>
               {userData && (
-                <div className="text-sm font-semibold text-gray-600">
+                <div className="text-sm font-semibold text-gray-600 dark:text-gray-400">
                   Welcome, {userData.display_name || userData.username}!
                 </div>
               )}
               {isMounted && isGuest && (
-                <div className="text-sm font-semibold text-gray-500">
+                <div className="text-sm font-semibold text-gray-500 dark:text-gray-400">
                   (Guest Mode - Progress won&apos;t save)
                 </div>
               )}
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-orange-100 px-4 py-2 rounded-xl border-2 border-orange-200">
-                <Flame className="w-5 h-5 text-orange-500" />
-                <span className="font-black text-orange-700">{userProgress.streak}</span>
+              <div className="flex items-center gap-2 bg-orange-100 dark:bg-orange-900 px-4 py-2 rounded-xl border-3 border-orange-300 dark:border-orange-700 shadow-md transform transition-all hover:scale-105" style={{ boxShadow: '0 4px 0 #fb923c, 0 6px 12px rgba(251, 146, 60, 0.3)' }}>
+                <Flame className="w-5 h-5 text-orange-500 drop-shadow-sm" />
+                <span className="font-black text-orange-700 dark:text-orange-100">{userProgress.streak}</span>
               </div>
-              <div className="flex items-center gap-2 bg-amber-100 px-4 py-2 rounded-xl border-2 border-amber-200">
-                <Zap className="w-5 h-5 text-amber-600" />
-                <span className="font-black text-amber-700">{userProgress.xp}</span>
+              <div className="flex items-center gap-2 bg-amber-100 dark:bg-amber-900 px-4 py-2 rounded-xl border-3 border-amber-300 dark:border-amber-700 shadow-md transform transition-all hover:scale-105" style={{ boxShadow: '0 4px 0 #fbbf24, 0 6px 12px rgba(251, 191, 36, 0.3)' }}>
+                <Zap className="w-5 h-5 text-amber-600 drop-shadow-sm" />
+                <span className="font-black text-amber-700 dark:text-amber-100">{userProgress.xp}</span>
               </div>
               <button
                 onClick={handleLogout}
-                className="ml-2 px-4 py-2 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition-colors"
+                className="ml-2 px-4 py-2 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transform transition-all hover:scale-105 border-b-4 border-red-700"
+                style={{ boxShadow: '0 4px 0 #b91c1c, 0 6px 12px rgba(220, 38, 38, 0.4)' }}
               >
                 Logout
               </button>
@@ -1301,10 +1302,10 @@ const MonetaPlatform = () => {
 
       {/* Chat Window - Duolingo Style */}
       {chatOpen && (
-        <div className="fixed bottom-28 right-8 w-96 bg-white rounded-3xl shadow-2xl overflow-hidden border-2 border-gray-200">
+        <div className="fixed bottom-28 right-8 w-96 bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-2xl">
+              <div className="w-10 h-10 bg-white dark:bg-gray-200 rounded-full flex items-center justify-center text-2xl">
                 🤖
               </div>
               <h3 className="font-black text-lg">Finance Coach</h3>
@@ -1318,13 +1319,13 @@ const MonetaPlatform = () => {
             </button>
           </div>
           
-          <div className="h-96 overflow-y-auto p-5 space-y-4 bg-gradient-to-b from-blue-50 to-white">
+          <div className="h-96 overflow-y-auto p-5 space-y-4 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
             {chatMessages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] p-4 rounded-2xl font-semibold shadow-md ${
                   msg.role === 'user' 
                     ? 'bg-blue-500 text-white rounded-br-sm' 
-                    : 'bg-white text-gray-800 rounded-bl-sm border-2 border-gray-100'
+                    : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm border-2 border-gray-100 dark:border-gray-600'
                 }`}>
                   {msg.text}
                 </div>
@@ -1332,7 +1333,7 @@ const MonetaPlatform = () => {
             ))}
             {loadingChat && (
               <div className="flex justify-start">
-                <div className="max-w-[75%] p-4 rounded-2xl font-semibold shadow-md bg-white text-gray-800 rounded-bl-sm border-2 border-gray-100 flex items-center gap-1">
+                <div className="max-w-[75%] p-4 rounded-2xl font-semibold shadow-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm border-2 border-gray-100 dark:border-gray-600 flex items-center gap-1">
                   <span className="sr-only">Typing</span>
                   <span className="w-2 h-2 bg-gray-400 rounded-full anim-bounce" style={{ animationDelay: '0ms' }}></span>
                   <span className="w-2 h-2 bg-gray-400 rounded-full anim-bounce" style={{ animationDelay: '150ms' }}></span>
@@ -1342,7 +1343,7 @@ const MonetaPlatform = () => {
             )}
           </div>
           
-          <div className="border-t-2 border-gray-100 p-4 bg-white">
+          <div className="border-t-2 border-gray-100 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -1355,7 +1356,7 @@ const MonetaPlatform = () => {
                   }
                 }}
                 placeholder="Ask me anything..."
-                className="flex-1 border-2 border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 font-semibold text-gray-900 placeholder-gray-400 bg-white"
+                className="flex-1 border-2 border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 font-semibold text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-gray-700"
               />
               <button
                 onClick={handleSendMessage}
