@@ -16,6 +16,16 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root() -> dict:
+    return {
+        "name": "Moneta API",
+        "version": "1.0.0",
+        "status": "running",
+        "docs": "/docs"
+    }
+
+
 @app.get("/health")
 def health() -> dict:
     return {"ok": True}
