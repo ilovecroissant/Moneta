@@ -1262,9 +1262,10 @@ const MonetaPlatform = () => {
           ) : (
             <div className="text-center py-12">
               {generatedLesson?.questions.map((q, qIndex) => {
+                const qKey = q.id || `q-${qIndex}`;
                 const detail = evaluation.details.find((d) => d.question_id === q.id);
                 const isCorrect = !!detail?.correct;
-                const userAns = userAnswers[q.id] || '';
+                const userAns = userAnswers[qKey] || '';
                 const correctAns = detail?.correct_answer || '';
                 const correctText = q.type === 'mcq'
                   ? (q.options || []).find((o) => o.id === correctAns)?.text || correctAns
