@@ -10,6 +10,8 @@ import {
   getProgress,
   setProgress,
   type Lesson as ApiLesson,
+  type Question,
+  type ChoiceOption,
   type EvaluateResponse,
   calculateLevel,
 } from '@/lib/api';
@@ -20,6 +22,14 @@ const CATEGORY_MAP: Record<string, string> = {
   'Credit & Debt': 'Credit & Debt',
   'Investing & Risk': 'Investing & Risk',
 };
+
+interface UserData {
+  user_id: number;
+  username: string;
+  email: string;
+  xp: number;
+  streak: number;
+}
 
 // Achievement definitions
 interface Achievement {
@@ -138,15 +148,9 @@ const ACHIEVEMENTS: Achievement[] = [
   }
 ];
 
-const CATEGORY_MAP_OLD: Record<string, string> = {
-  'Budgeting Basics': 'Budgeting & Saving Basics',
-  'Credit & Debt': 'Credit & Debt',
-  'Investing & Risk': 'Investing & Risk',
-};
-
 // Memoized question component to prevent re-renders
 const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegisterRef }: { 
-  question: any; 
+  question: Question; 
   value: string; 
   onChange: (val: string) => void;
   onLiveChange?: (val: string) => void;
@@ -168,7 +172,7 @@ const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegiste
   if (question.type === 'mcq') {
     return (
       <div className="space-y-3">
-        {(question.options || []).map((opt: any) => (
+        {(question.options || []).map((opt: ChoiceOption) => (
           <button
             key={opt.id}
             onClick={() => onChange(opt.id)}
@@ -232,8 +236,7 @@ QuestionInput.displayName = 'QuestionInput';
 
 const MonetaPlatform = () => {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<number | null>(null);
@@ -261,7 +264,6 @@ const MonetaPlatform = () => {
       return;
     }
     
-    setIsAuthenticated(true);
     setIsGuest(isGuestMode);
     if (savedUserData) {
       setUserData(JSON.parse(savedUserData));
@@ -295,7 +297,6 @@ const MonetaPlatform = () => {
     dailyProgress: 0,
     perfectScores: 0, // Track number of perfect scores
   });
-  const [progressUnlocked, setProgressUnlocked] = useState<string[]>([]);
   const [lastStreakDate, setLastStreakDate] = useState<string | null>(null);
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [newStreakValue, setNewStreakValue] = useState(0);
@@ -426,7 +427,6 @@ const MonetaPlatform = () => {
             console.error('❌ Failed to save inferred lessons:', err);
           }
         }
-        setProgressUnlocked(p.unlocked || []);
       } catch (e) {
         console.error('❌ Failed to load progress:', e);
         // best-effort: keep defaults when backend not available
@@ -687,7 +687,7 @@ const MonetaPlatform = () => {
       const resp = await evaluateAnswers({
         lesson: generatedLesson,
         answers: generatedLesson.questions.map((q, idx) => {
-          const key = (q as any)?.id || `q-${idx}`;
+          const key = q.id || `q-${idx}`;
           return {
             question_id: q.id,
             user_answer: userAnswers[key] || '',
@@ -703,7 +703,7 @@ const MonetaPlatform = () => {
         
         // Identify questions that were wrong on the FIRST attempt
         const incorrectQuestions = generatedLesson.questions.filter((q, idx) => {
-          const qKey = (q as any)?.id || `q-${idx}`;
+          const qKey = q.id || `q-${idx}`;
           return firstAttemptWrong[qKey] === true;
         });
 
@@ -792,7 +792,7 @@ const MonetaPlatform = () => {
         <h2 className="text-4xl font-black text-gray-800 dark:text-gray-100 mb-2 transition-opacity duration-500">
           {motivationalQuote}
         </h2>
-        <p className="text-gray-600 dark:text-gray-300 text-lg">You're on a {userProgress.streak} day streak!</p>
+        <p className="text-gray-600 dark:text-gray-300 text-lg">You&apos;re on a {userProgress.streak} day streak!</p>
       </div>
 
       {/* Daily Goal Progress */}
@@ -988,20 +988,23 @@ const MonetaPlatform = () => {
   );
 
   const LessonView = () => {
-    const node = lessons.find((l) => l.id === selectedLesson);
-    if (!node) return null;
+    // Hooks must be called before any early returns
     const [checkMessage, setCheckMessage] = useState<string | null>(null);
     const [checkingFree, setCheckingFree] = useState(false);
     const [showCheckAnimation, setShowCheckAnimation] = useState(false);
-
-    const totalQuestions = generatedLesson?.questions.length || 0;
+    
     const answeredCount = useMemo(() => {
       if (!generatedLesson) return 0;
       return generatedLesson.questions.filter((q, idx) => {
-        const key = (q as any)?.id || `q-${idx}`;
+        const key = q.id || `q-${idx}`;
         return (userAnswers[key] || '').trim() !== '';
       }).length;
     }, [generatedLesson, userAnswers]);
+    
+    const node = lessons.find((l) => l.id === selectedLesson);
+    if (!node) return null;
+
+    const totalQuestions = generatedLesson?.questions.length || 0;
 
     const progressWidth = totalQuestions ? (answeredCount / totalQuestions) * 100 : 0;
 
@@ -1056,7 +1059,7 @@ const MonetaPlatform = () => {
                 <div className="space-y-8">
                   {(() => {
                     const q = generatedLesson.questions[currentQuestionIdx];
-                    const qKey = (q as any)?.id || `q-${currentQuestionIdx}`;
+                    const qKey = q.id || `q-${currentQuestionIdx}`;
                     if (!q) return null;
                     return (
                       <div key={`${qKey}-${currentQuestionIdx}`} className={`space-y-4 relative ${showCheckAnimation ? 'anim-bounce-in' : ''}`}>
@@ -1231,7 +1234,7 @@ const MonetaPlatform = () => {
                   {currentQuestionIdx === totalQuestions - 1 && (() => {
                     // Check if all questions are marked correct
                     const allCorrect = generatedLesson?.questions.every((q, idx) => {
-                      const key = (q as any)?.id || `q-${idx}`;
+                      const key = q.id || `q-${idx}`;
                       return questionCorrectMap[key];
                     }) || false;
                     const canFinish = allCorrect || answeredCount >= totalQuestions;

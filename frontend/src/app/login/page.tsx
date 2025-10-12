@@ -53,8 +53,8 @@ export default function LoginPage() {
 
       // Redirect to main app
       router.push('/');
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -245,7 +245,7 @@ export default function LoginPage() {
           Continue as Guest
         </button>
         <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2 font-semibold">
-          Guest mode: Progress won't be saved
+          Guest mode: Progress won&apos;t be saved
         </p>
       </div>
     </div>

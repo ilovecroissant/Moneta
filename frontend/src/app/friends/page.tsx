@@ -50,8 +50,8 @@ export default function FriendsPage() {
     try {
       const friendsList = await getFriends(userId);
       setFriends(friendsList);
-    } catch (error) {
-      console.error('Failed to load friends:', error);
+    } catch (_error) {
+      console.error('Failed to load friends:', _error);
     } finally {
       setLoading(false);
     }
@@ -61,8 +61,8 @@ export default function FriendsPage() {
     try {
       const requests = await getFriendRequests(userId);
       setFriendRequests(requests.incoming || []);
-    } catch (error) {
-      console.error('Failed to load friend requests:', error);
+    } catch (_error) {
+      console.error('Failed to load friend requests:', _error);
     }
   };
 
@@ -77,8 +77,8 @@ export default function FriendsPage() {
       const results = await searchUsers(searchQuery, userData.id);
       // Filter out current user
       setSearchResults(results.filter(u => u.id !== userData?.id));
-    } catch (error) {
-      console.error('Search failed:', error);
+    } catch (_error) {
+      console.error('Search failed:', _error);
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
@@ -102,10 +102,10 @@ export default function FriendsPage() {
       await sendFriendRequest(userData.id, toUserId);
       alert('Friend request sent! ✅');
       handleSearch(); // Refresh results
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send friend request';
+    } catch (_error) {
+      const errorMessage = _error instanceof Error ? _error.message : 'Failed to send friend request';
       alert(`❌ ${errorMessage}`);
-      console.error('Send friend request error:', error);
+      console.error('Send friend request error:', _error);
     }
   };
 
@@ -116,7 +116,7 @@ export default function FriendsPage() {
         loadFriendRequests(userData.id);
         loadFriends(userData.id);
       }
-    } catch (error) {
+    } catch {
       alert('Failed to accept friend request');
     }
   };
@@ -127,7 +127,7 @@ export default function FriendsPage() {
       if (userData) {
         loadFriendRequests(userData.id);
       }
-    } catch (error) {
+    } catch {
       alert('Failed to reject friend request');
     }
   };
@@ -138,7 +138,7 @@ export default function FriendsPage() {
     try {
       await removeFriend(userData.id, friendId);
       loadFriends(userData.id);
-    } catch (error) {
+    } catch {
       alert('Failed to remove friend');
     }
   };

@@ -142,7 +142,7 @@ export async function evaluateAnswers(params: {
 
 // Check Free Response API
 export async function checkFree(params: { 
-  question: any; 
+  question: Question; 
   user_answer: string 
 }): Promise<FreeCheckResponse> {
   try {
@@ -163,7 +163,7 @@ export async function checkFree(params: {
       try {
         const errorData = await response.json();
         errorMessage = errorData.detail || errorMessage;
-      } catch (parseError) {
+      } catch {
         // If JSON parsing fails, use the default error message
         console.warn('Could not parse error response as JSON');
       }
