@@ -21,6 +21,129 @@ const CATEGORY_MAP: Record<string, string> = {
   'Investing & Risk': 'Investing & Risk',
 };
 
+// Achievement definitions
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  type: 'category' | 'streak' | 'performance';
+  requirement: {
+    type: 'complete_lessons' | 'streak_days' | 'perfect_score';
+    value: number | number[];
+  };
+}
+
+const ACHIEVEMENTS: Achievement[] = [
+  // Category Achievements
+  {
+    id: 'budget_master',
+    title: 'Budget Master',
+    description: 'Complete all Budgeting Basics lessons',
+    icon: '🏆',
+    type: 'category',
+    requirement: { type: 'complete_lessons', value: [0, 1, 2] }
+  },
+  {
+    id: 'credit_expert',
+    title: 'Credit Expert',
+    description: 'Complete all Credit & Debt lessons',
+    icon: '💎',
+    type: 'category',
+    requirement: { type: 'complete_lessons', value: [3, 4, 5] }
+  },
+  {
+    id: 'investment_guru',
+    title: 'Investment Guru',
+    description: 'Complete all Investing & Risk lessons',
+    icon: '📈',
+    type: 'category',
+    requirement: { type: 'complete_lessons', value: [6, 7] }
+  },
+  
+  // Streak Achievements
+  {
+    id: 'streak_3',
+    title: 'On Fire!',
+    description: 'Maintain a 3-day streak',
+    icon: '🔥',
+    type: 'streak',
+    requirement: { type: 'streak_days', value: 3 }
+  },
+  {
+    id: 'streak_7',
+    title: 'Week Warrior',
+    description: 'Maintain a 7-day streak',
+    icon: '⚡',
+    type: 'streak',
+    requirement: { type: 'streak_days', value: 7 }
+  },
+  {
+    id: 'streak_14',
+    title: 'Fortnight Champion',
+    description: 'Maintain a 14-day streak',
+    icon: '🌟',
+    type: 'streak',
+    requirement: { type: 'streak_days', value: 14 }
+  },
+  {
+    id: 'streak_30',
+    title: 'Monthly Master',
+    description: 'Maintain a 30-day streak',
+    icon: '💫',
+    type: 'streak',
+    requirement: { type: 'streak_days', value: 30 }
+  },
+  {
+    id: 'streak_60',
+    title: 'Two Month Titan',
+    description: 'Maintain a 60-day streak',
+    icon: '🌠',
+    type: 'streak',
+    requirement: { type: 'streak_days', value: 60 }
+  },
+  {
+    id: 'streak_100',
+    title: 'Century Club',
+    description: 'Maintain a 100-day streak',
+    icon: '💯',
+    type: 'streak',
+    requirement: { type: 'streak_days', value: 100 }
+  },
+  {
+    id: 'streak_365',
+    title: 'Year Legend',
+    description: 'Maintain a 365-day streak',
+    icon: '👑',
+    type: 'streak',
+    requirement: { type: 'streak_days', value: 365 }
+  },
+  
+  // Performance Achievements
+  {
+    id: 'flawless_lesson',
+    title: 'Flawless Victory',
+    description: 'Complete a lesson with 100% score',
+    icon: '✨',
+    type: 'performance',
+    requirement: { type: 'perfect_score', value: 1 }
+  },
+  {
+    id: 'flawless_5',
+    title: 'Perfectionist',
+    description: 'Complete 5 lessons with 100% score',
+    icon: '🎯',
+    type: 'performance',
+    requirement: { type: 'perfect_score', value: 5 }
+  }
+];
+
+const CATEGORY_MAP_OLD: Record<string, string> = {
+  'Budgeting Basics': 'Budgeting & Saving Basics',
+  'Credit & Debt': 'Credit & Debt',
+  'Investing & Risk': 'Investing & Risk',
+};
+
 // Memoized question component to prevent re-renders
 const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegisterRef }: { 
   question: any; 
@@ -168,11 +291,58 @@ const MonetaPlatform = () => {
     completedLessons: [] as number[],
     dailyGoal: 50,
     dailyProgress: 0,
+    perfectScores: 0, // Track number of perfect scores
   });
   const [progressUnlocked, setProgressUnlocked] = useState<string[]>([]);
   const [lastStreakDate, setLastStreakDate] = useState<string | null>(null);
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [newStreakValue, setNewStreakValue] = useState(0);
+  
+  // Achievements state
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+  const [showAchievementModal, setShowAchievementModal] = useState(false);
+  const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
+
+  // Check if user has unlocked an achievement
+  const checkAchievements = (completedLessons: number[], streak: number, perfectScores: number) => {
+    const newlyUnlocked: Achievement[] = [];
+    
+    ACHIEVEMENTS.forEach(achievement => {
+      // Skip if already unlocked
+      if (unlockedAchievements.includes(achievement.id)) return;
+      
+      let isUnlocked = false;
+      
+      if (achievement.requirement.type === 'complete_lessons') {
+        const requiredLessons = achievement.requirement.value as number[];
+        isUnlocked = requiredLessons.every(lessonId => completedLessons.includes(lessonId));
+      } else if (achievement.requirement.type === 'streak_days') {
+        isUnlocked = streak >= (achievement.requirement.value as number);
+      } else if (achievement.requirement.type === 'perfect_score') {
+        isUnlocked = perfectScores >= (achievement.requirement.value as number);
+      }
+      
+      if (isUnlocked) {
+        newlyUnlocked.push(achievement);
+      }
+    });
+    
+    // Show modal for newly unlocked achievements (one at a time)
+    if (newlyUnlocked.length > 0) {
+      const achievementIds = newlyUnlocked.map(a => a.id);
+      setUnlockedAchievements(prev => [...prev, ...achievementIds]);
+      
+      // Store in localStorage
+      try {
+        const storageKey = `moneta_achievements_${handleId}`;
+        localStorage.setItem(storageKey, JSON.stringify([...unlockedAchievements, ...achievementIds]));
+      } catch (_) {}
+      
+      // Show the first new achievement
+      setNewAchievement(newlyUnlocked[0]);
+      setShowAchievementModal(true);
+    }
+  };
 
   // Check if we should increment streak for today (once per calendar day)
   const maybeIncrementStreakForToday = () => {
@@ -199,7 +369,10 @@ const MonetaPlatform = () => {
     
     (async () => {
       try {
+        console.log('📥 Loading progress for user:', handleId);
         const p = await getProgress(handleId);
+        console.log('📦 Received progress from backend:', p);
+        
         const completedFromBackend = Array.isArray(p.completed_lessons) ? p.completed_lessons : [];
         let inferredCompleted: number[] = completedFromBackend;
         if (completedFromBackend.length === 0 && typeof p.xp === 'number' && p.xp > 0) {
@@ -214,6 +387,7 @@ const MonetaPlatform = () => {
             }
           }
           inferredCompleted = calc;
+          console.log('🔍 Inferred completed lessons from XP:', inferredCompleted);
         }
 
         const updatedProgress = {
@@ -227,12 +401,17 @@ const MonetaPlatform = () => {
         setUserProgress(updatedProgress);
         // If backend has no completed lessons but we inferred some, persist them
         if ((p.completed_lessons?.length || 0) === 0 && inferredCompleted.length > 0) {
+          console.log('💾 Backend has no completed lessons, saving inferred ones:', inferredCompleted);
           try {
-            await setProgress(handleId, { xp: p.xp, streak: p.streak, completed_lessons: inferredCompleted });
-          } catch (_) {}
+            const saved = await setProgress(handleId, { xp: p.xp, streak: p.streak, completed_lessons: inferredCompleted });
+            console.log('✅ Saved inferred lessons:', saved);
+          } catch (err) {
+            console.error('❌ Failed to save inferred lessons:', err);
+          }
         }
         setProgressUnlocked(p.unlocked || []);
       } catch (e) {
+        console.error('❌ Failed to load progress:', e);
         // best-effort: keep defaults when backend not available
       }
       try {
@@ -240,6 +419,26 @@ const MonetaPlatform = () => {
         const storageKey = `moneta_last_streak_date_${handleId}`;
         const saved = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
         if (saved) setLastStreakDate(saved);
+        
+        // Load achievements from localStorage
+        const achievementKey = `moneta_achievements_${handleId}`;
+        const savedAchievements = typeof window !== 'undefined' ? localStorage.getItem(achievementKey) : null;
+        if (savedAchievements) {
+          try {
+            const parsed = JSON.parse(savedAchievements);
+            setUnlockedAchievements(parsed);
+          } catch (_) {}
+        }
+        
+        // Load perfect scores count
+        const perfectKey = `moneta_perfect_scores_${handleId}`;
+        const savedPerfect = typeof window !== 'undefined' ? localStorage.getItem(perfectKey) : null;
+        if (savedPerfect) {
+          try {
+            const count = parseInt(savedPerfect, 10);
+            setUserProgress(prev => ({ ...prev, perfectScores: count }));
+          } catch (_) {}
+        }
         
         // Clean up old global key (migration)
         if (typeof window !== 'undefined') {
@@ -437,6 +636,18 @@ const MonetaPlatform = () => {
           ? userProgress.completedLessons
           : [...userProgress.completedLessons, node.id];
         
+        // Check if this is a perfect score (100%)
+        const isPerfectScore = resp.score === 1.0;
+        const newPerfectScores = isPerfectScore ? userProgress.perfectScores + 1 : userProgress.perfectScores;
+        
+        // Save perfect score count to localStorage
+        if (isPerfectScore) {
+          try {
+            const perfectKey = `moneta_perfect_scores_${handleId}`;
+            localStorage.setItem(perfectKey, String(newPerfectScores));
+          } catch (_) {}
+        }
+        
         // Check if we should increment streak
         const streakResult = maybeIncrementStreakForToday();
         const finalStreak = streakResult.streak;
@@ -449,10 +660,14 @@ const MonetaPlatform = () => {
           completed_lessons: updatedCompleted 
         };
         
+        console.log('💾 Saving progress:', progressUpdate);
         try {
           const saved = await setProgress(handleId, progressUpdate);
+          console.log('✅ Progress saved successfully:', saved);
           if (typeof saved?.daily_xp === 'number') savedDailyXp = saved.daily_xp;
-        } catch (_) {}
+        } catch (err) {
+          console.error('❌ Failed to save progress:', err);
+        }
         
         setUserProgress((prev) => ({
           ...prev,
@@ -461,7 +676,11 @@ const MonetaPlatform = () => {
           streak: finalStreak,
           completedLessons: updatedCompleted,
           dailyProgress: savedDailyXp,
+          perfectScores: newPerfectScores,
         }));
+        
+        // Check for newly unlocked achievements
+        checkAchievements(updatedCompleted, finalStreak, newPerfectScores);
         
         // Show celebration
         setShowCelebration(true);
@@ -529,22 +748,47 @@ const MonetaPlatform = () => {
       <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
         <h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
           <Trophy className="w-6 h-6 text-amber-500" />
-          Achievements
+          Achievements ({unlockedAchievements.length}/{ACHIEVEMENTS.length})
         </h3>
         <div className="grid grid-cols-3 gap-3">
-          <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl border-2 border-emerald-200">
-            <div className="text-4xl mb-2">🏦</div>
-            <div className="text-xs font-bold text-emerald-700">Budget<br/>Master</div>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border-2 border-blue-200">
-            <div className="text-4xl mb-2">💳</div>
-            <div className="text-xs font-bold text-blue-700">Credit<br/>Expert</div>
-          </div>
-          <div className="text-center p-4 bg-gray-100 rounded-2xl border-2 border-gray-200">
-            <div className="text-4xl mb-2 opacity-40">📈</div>
-            <div className="text-xs font-bold text-gray-400">Investor<br/>Pro</div>
-          </div>
+          {ACHIEVEMENTS.slice(0, 6).map(achievement => {
+            const isUnlocked = unlockedAchievements.includes(achievement.id);
+            return (
+              <div 
+                key={achievement.id}
+                className={`text-center p-4 rounded-2xl border-2 transition-all ${
+                  isUnlocked 
+                    ? 'bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200 scale-100' 
+                    : 'bg-gray-100 border-gray-200 opacity-60'
+                }`}
+              >
+                <div className={`text-4xl mb-2 ${!isUnlocked && 'opacity-40 grayscale'}`}>
+                  {achievement.icon}
+                </div>
+                <div className={`text-xs font-bold ${isUnlocked ? 'text-amber-700' : 'text-gray-400'}`}>
+                  {achievement.title.split(' ').map((word, i) => (
+                    <React.Fragment key={i}>
+                      {word}
+                      {i < achievement.title.split(' ').length - 1 && <br />}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
+        {unlockedAchievements.length > 0 && (
+          <div className="mt-4 text-center text-xs text-gray-600">
+            <button 
+              onClick={() => {
+                alert(`Unlocked Achievements:\n\n${ACHIEVEMENTS.filter(a => unlockedAchievements.includes(a.id)).map(a => `${a.icon} ${a.title} - ${a.description}`).join('\n')}`);
+              }}
+              className="text-blue-600 hover:text-blue-800 font-semibold underline"
+            >
+              View All ({unlockedAchievements.length})
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Learning Path - Duolingo Style */}
@@ -1141,6 +1385,37 @@ const MonetaPlatform = () => {
               className="bg-white text-gray-900 font-black text-2xl py-4 px-12 rounded-2xl hover:scale-105 transition-transform shadow-xl"
             >
               I&apos;m Committed! 💪
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Achievement Unlocked Modal */}
+      {showAchievementModal && newAchievement && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm">
+          <div className="bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 rounded-3xl p-12 shadow-2xl max-w-md mx-4 text-center">
+            {/* Trophy Icon */}
+            <div className="text-8xl mb-6 animate-bounce">
+              {newAchievement.icon}
+            </div>
+            
+            {/* Achievement Title */}
+            <h2 className="text-4xl font-black text-white mb-3">
+              Achievement Unlocked!
+            </h2>
+            <h3 className="text-3xl font-bold text-white/95 mb-2">
+              {newAchievement.title}
+            </h3>
+            <p className="text-lg text-white/90 mb-8 font-semibold">
+              {newAchievement.description}
+            </p>
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setShowAchievementModal(false)}
+              className="bg-white text-gray-900 font-black text-2xl py-4 px-12 rounded-2xl hover:scale-105 transition-transform shadow-xl"
+            >
+              Awesome! 🎉
             </button>
           </div>
         </div>
