@@ -1147,46 +1147,6 @@ const MicroSimulation = () => {
   const months = years * 12;
   const future = amount * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
 
-  return (
-    <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
-      <h3 className="text-xl font-black text-gray-800 mb-4">What if you save monthly?</h3>
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div>
-          <label className="block text-xs font-bold text-gray-600 mb-1">Monthly Amount</label>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(Number(e.target.value) || 0)}
-            className="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-gray-900"
-            min={0}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-600 mb-1">Years</label>
-          <input
-            type="number"
-            value={years}
-            onChange={(e) => setYears(Number(e.target.value) || 0)}
-            className="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-gray-900"
-            min={0}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-600 mb-1">Annual Return %</label>
-          <input
-            type="number"
-            value={rate}
-            onChange={(e) => setRate(Number(e.target.value) || 0)}
-            className="w-full border-2 border-gray-300 rounded-xl px-3 py-2 text-gray-900"
-            min={0}
-          />
-        </div>
-      </div>
-      <div className="bg-blue-50 border-2 border-blue-100 rounded-2xl p-4 font-bold text-blue-800">
-        If you save ${amount}/mo for {years} years at {rate}%: ≈ ${future.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-      </div>
-    </div>
-  );
 };
 
 export default MonetaPlatform;
