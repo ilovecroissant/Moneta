@@ -24,3 +24,51 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* --- Animations --- */
+@keyframes pop-in {
+  0% { transform: scale(0.9); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes subtle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
+  70% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@keyframes confetti-pop {
+  0% { transform: translateY(-10px) scale(0.8); opacity: 0; }
+  50% { transform: translateY(-6px) scale(1.05); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 0; }
+}
+
+.anim-pop-in { animation: pop-in 300ms ease-out; }
+.anim-bounce { animation: subtle-bounce 1.8s ease-in-out infinite; }
+.anim-pulse-ring { animation: pulse-ring 1.8s ease-out infinite; }
+.anim-shake { animation: shake 400ms ease-in-out; }
+
+/* Confetti bits container */
+.confetti { position: relative; }
+.confetti::before, .confetti::after {
+  content: "";
+  position: absolute;
+  width: 6px; height: 6px; border-radius: 2px;
+  animation: confetti-pop 700ms ease-out forwards;
+}
+.confetti::before { background: #f59e0b; left: -12px; top: -6px; }
+.confetti::after { background: #22c55e; right: -12px; top: -6px; }

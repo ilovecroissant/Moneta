@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, memo } from 'react';
+import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
 import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, BookOpen, Send, X, Zap, Target } from 'lucide-react';
 import {
   chat as chatApi,
@@ -20,10 +20,11 @@ const CATEGORY_MAP: Record<string, string> = {
 };
 
 // Memoized question component to prevent re-renders
-const QuestionInput = memo(({ question, value, onChange }: { 
+const QuestionInput = memo(({ question, value, onChange, onLiveChange }: { 
   question: any; 
   value: string; 
   onChange: (val: string) => void;
+  onLiveChange?: (val: string) => void;
 }) => {
   const [localValue, setLocalValue] = useState(value);
 
@@ -44,10 +45,11 @@ const QuestionInput = memo(({ question, value, onChange }: {
           <button
             key={opt.id}
             onClick={() => onChange(opt.id)}
+            onMouseDown={(e) => e.preventDefault()}
             type="button"
-            className={`w-full text-left p-5 rounded-2xl border-2 font-semibold text-lg transition-all ${
+            className={`w-full text-left p-5 rounded-2xl border-2 font-semibold text-lg transition-colors ${
               value === opt.id
-                ? 'border-sky-500 bg-sky-50 text-gray-900 shadow-lg scale-105'
+                ? 'border-sky-500 bg-sky-50 text-gray-900 shadow-lg'
                 : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50'
             }`}
           >
@@ -63,7 +65,7 @@ const QuestionInput = memo(({ question, value, onChange }: {
       <input
         type="text"
         value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
+        onChange={(e) => { const v = e.target.value; setLocalValue(v); onLiveChange && onLiveChange(v); }}
         onBlur={handleBlur}
         placeholder="Type your answer"
         className="w-full border-2 border-gray-300 rounded-2xl px-4 py-4 font-semibold text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
@@ -77,7 +79,7 @@ const QuestionInput = memo(({ question, value, onChange }: {
     return (
       <textarea
         value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
+        onChange={(e) => { const v = e.target.value; setLocalValue(v); onLiveChange && onLiveChange(v); }}
         onBlur={handleBlur}
         placeholder="Explain in your own words..."
         className="w-full border-2 border-gray-300 rounded-2xl px-4 py-4 font-semibold text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
@@ -110,6 +112,7 @@ const FinLitPlatform = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const liveAnswersRef = useRef<Record<string, string>>({});
 
   // Basic demo handle for progress
   const handleId = 'demo';
@@ -325,16 +328,16 @@ const FinLitPlatform = () => {
         const newXp = userProgress.xp + node.xp;
         const { streak: maybeNewStreak } = await maybeIncrementStreakForToday(newXp, node.xp);
         setUserProgress((prev) => ({
-          ...prev,
+        ...prev,
           xp: newXp,
           streak: maybeNewStreak,
           completedLessons: prev.completedLessons.includes(node.id)
             ? prev.completedLessons
             : [...prev.completedLessons, node.id],
           dailyProgress: prev.dailyProgress + node.xp,
-        }));
-        setShowCelebration(true);
-        setTimeout(() => setShowCelebration(false), 3000);
+      }));
+      setShowCelebration(true);
+      setTimeout(() => setShowCelebration(false), 3000);
       }
     } catch (e) {
       // ignore for MVP
@@ -462,9 +465,9 @@ const FinLitPlatform = () => {
                     isLocked
                       ? 'bg-gray-300 border-gray-400'
                       : isCompleted
-                      ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-600'
+                      ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-600 anim-pop-in'
                       : isNext
-                      ? 'bg-gradient-to-br ' + lesson.color + ' border-white animate-pulse'
+                      ? 'bg-gradient-to-br ' + lesson.color + ' border-white anim-bounce anim-pulse-ring'
                       : 'bg-white border-gray-300'
                   }`}>
                     {isLocked ? (
@@ -492,7 +495,7 @@ const FinLitPlatform = () => {
 
                   {/* Lesson Info Tooltip */}
                   <div className={`absolute top-full mt-4 left-1/2 transform -translate-x-1/2 transition-all ${
-                    isLocked ? 'opacity-60' : 'group-hover:scale-105'
+                    isLocked ? 'opacity-60' : ''
                   }`}>
                     <div className="bg-white rounded-2xl p-4 shadow-xl border-2 border-gray-100 min-w-48 text-center">
                       <div className="font-black text-gray-800 text-sm mb-1">
@@ -545,7 +548,7 @@ const FinLitPlatform = () => {
       <div className="max-w-2xl mx-auto">
         {/* Progress Bar */}
         <div className="bg-white rounded-full h-4 mb-6 overflow-hidden shadow-inner">
-          <div
+          <div 
             className="h-full bg-gradient-to-r from-green-400 to-green-500 transition-all duration-300"
             style={{ width: `${progressWidth}%` }}
           />
@@ -581,6 +584,7 @@ const FinLitPlatform = () => {
                           question={q}
                           value={userAnswers[q.id] || ''}
                           onChange={(val) => setAnswer(q.id, val)}
+                          onLiveChange={(val) => { liveAnswersRef.current[q.id] = val; }}
                         />
 
                         {q.hint && (
@@ -594,12 +598,13 @@ const FinLitPlatform = () => {
                         <div className="flex gap-3 pt-2">
                           <button
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               setCheckMessage(null);
                               // Capture current index to guard against async updates
                               const idxAtClick = currentQuestionIdx;
                               // Evaluate current question only
-                              const uaRaw = (userAnswers[q.id] || '').trim();
+                              const uaRaw = (liveAnswersRef.current[q.id] ?? userAnswers[q.id] ?? '').trim();
                               const caRaw = (q.correct_answer || '').trim();
                               const ua = uaRaw.toUpperCase();
                               const ca = caRaw.toUpperCase();
@@ -641,7 +646,9 @@ const FinLitPlatform = () => {
                                   .finally(() => setCheckingFree(false));
                               }
                             }}
-                            className="flex-1 bg-sky-600 text-white font-black py-4 rounded-2xl hover:bg-sky-700 transition-colors shadow-md disabled:opacity-50"
+                            className={`flex-1 text-white font-black py-4 rounded-2xl transition-colors shadow-md disabled:opacity-50 ${
+                              checkMessage && checkMessage.startsWith('❌') ? 'bg-rose-500 hover:bg-rose-600' : 'bg-sky-600 hover:bg-sky-700'
+                            }`}
                             disabled={checkingFree}
                           >
                             {checkingFree ? 'CHECKING…' : 'CHECK'}
@@ -649,12 +656,13 @@ const FinLitPlatform = () => {
 
                           <button
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               const idxAtClick = currentQuestionIdx;
                               // Only allow next if correct answer is present and matches
                               const ca = (q.correct_answer || '').trim();
                               if (!ca && q.type !== 'free') return; // require correct answers for non-free
-                              const ua = (userAnswers[q.id] || '').trim();
+                              const ua = (liveAnswersRef.current[q.id] ?? userAnswers[q.id] ?? '').trim();
                               const allow = q.type === 'mcq' ? ua.toUpperCase() === ca.toUpperCase() : (q.type === 'fill' ? ua.length > 0 && ca.length > 0 : !!ua);
                               if (allow) {
                                 setCheckMessage(null);
@@ -672,14 +680,14 @@ const FinLitPlatform = () => {
                   })()}
 
                   {currentQuestionIdx === totalQuestions - 1 && (
-                    <button
-                      onClick={submitQuiz}
+                  <button
+                    onClick={submitQuiz}
                       disabled={!generatedLesson || answeredCount < totalQuestions || isSubmitting}
                       type="button"
-                      className="mt-6 w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-black text-xl py-5 rounded-2xl hover:from-green-600 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                      className="mt-6 w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-black text-xl py-5 rounded-2xl hover:from-green-600 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed confetti"
+                  >
                       {isSubmitting ? 'CHECKING...' : 'FINISH' }
-                    </button>
+                  </button>
                   )}
                 </div>
               ) : (
@@ -706,23 +714,23 @@ const FinLitPlatform = () => {
                 return (
                   <div key={`${q.id}-${qIndex}`} className="mb-8 text-left">
                     <div className={`p-6 rounded-2xl ${isCorrect ? 'bg-green-50 border-2 border-green-400' : 'bg-red-50 border-2 border-red-400'}`}>
-                      <div className="flex items-start gap-3 mb-3">
+                    <div className="flex items-start gap-3 mb-3">
                         {isCorrect ? (
-                          <CheckCircle className="w-8 h-8 text-green-500 flex-shrink-0 mt-1" />
-                        ) : (
-                          <X className="w-8 h-8 text-red-500 flex-shrink-0 mt-1" />
-                        )}
-                        <div>
+                        <CheckCircle className="w-8 h-8 text-green-500 flex-shrink-0 mt-1" />
+                      ) : (
+                        <X className="w-8 h-8 text-red-500 flex-shrink-0 mt-1" />
+                      )}
+                      <div>
                           <p className="font-bold text-gray-800 text-lg mb-2">{q.prompt}</p>
                           {!isCorrect && (
-                            <div className="space-y-2">
+                          <div className="space-y-2">
                               <p className="text-red-700 font-semibold">Your answer: {userText || '—'}</p>
                               <p className="text-green-700 font-semibold">Correct answer: {correctText || '—'}</p>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="bg-blue-100 border-l-4 border-blue-500 p-4 rounded-lg ml-11">
+                    </div>
+                    <div className="bg-blue-100 border-l-4 border-blue-500 p-4 rounded-lg ml-11">
                         <p className="text-blue-800 font-semibold text-sm">💡 {detail?.explanation || q.explanation}</p>
                       </div>
                     </div>
@@ -840,8 +848,11 @@ const FinLitPlatform = () => {
             ))}
             {loadingChat && (
               <div className="flex justify-start">
-                <div className="max-w-[75%] p-4 rounded-2xl font-semibold shadow-md bg-white text-gray-800 rounded-bl-sm border-2 border-gray-100">
-                  Thinking...
+                <div className="max-w-[75%] p-4 rounded-2xl font-semibold shadow-md bg-white text-gray-800 rounded-bl-sm border-2 border-gray-100 flex items-center gap-1">
+                  <span className="sr-only">Typing</span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full anim-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full anim-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full anim-bounce" style={{ animationDelay: '300ms' }}></span>
                 </div>
               </div>
             )}
