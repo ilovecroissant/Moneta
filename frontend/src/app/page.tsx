@@ -615,10 +615,13 @@ const MonetaPlatform = () => {
     try {
       const resp = await evaluateAnswers({
         lesson: generatedLesson,
-        answers: generatedLesson.questions.map((q) => ({
-          question_id: q.id,
-          user_answer: userAnswers[q.id] || '',
-        })),
+        answers: generatedLesson.questions.map((q, idx) => {
+          const key = (q as any)?.id || `q-${idx}`;
+          return {
+            question_id: q.id,
+            user_answer: userAnswers[key] || '',
+          };
+        }),
       });
       setEvaluation(resp);
 
@@ -920,7 +923,10 @@ const MonetaPlatform = () => {
     const totalQuestions = generatedLesson?.questions.length || 0;
     const answeredCount = useMemo(() => {
       if (!generatedLesson) return 0;
-      return generatedLesson.questions.filter((q) => (userAnswers[q.id] || '').trim() !== '').length;
+      return generatedLesson.questions.filter((q, idx) => {
+        const key = (q as any)?.id || `q-${idx}`;
+        return (userAnswers[key] || '').trim() !== '';
+      }).length;
     }, [generatedLesson, userAnswers]);
 
     const progressWidth = totalQuestions ? (answeredCount / totalQuestions) * 100 : 0;
@@ -999,7 +1005,11 @@ const MonetaPlatform = () => {
                           {!questionCorrectMap[qKey] && (
                             <button
                               type="button"
+                              onMouseDown={(e) => e.preventDefault()}
                               onClick={() => {
+                                // Prevent multiple clicks while already checking
+                                if (checkingFree) return;
+                                
                                 setCheckMessage('Checking…');
                                // Capture current index to guard against async updates
                                const idxAtClick = currentQuestionIdx;
@@ -1012,10 +1022,12 @@ const MonetaPlatform = () => {
                                   setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
                                 let isCorrect = false;
                                 const proceed = (ok: boolean, message?: string) => {
+                                  // Batch all state updates together
                                   setQuestionEvaluatedMap((prev) => ({ ...prev, [qKey]: true }));
                                   setQuestionCorrectMap((prev) => ({ ...prev, [qKey]: ok }));
+                                  setCheckMessage(message || (ok ? '✅ Correct!' : '❌ Not quite. Try again!'));
+                                  
                                   if (ok) {
-                                    setCheckMessage(message || '✅ Correct!');
                                     setShowQuestionConfetti(true);
                                     setTimeout(() => setShowQuestionConfetti(false), 1000);
                                     // play sound and spawn confetti dots
@@ -1033,7 +1045,6 @@ const MonetaPlatform = () => {
                                     setGlobalConfetti(dots);
                                     setTimeout(() => setGlobalConfetti([]), 1000);
                                   } else {
-                                    setCheckMessage(message || '❌ Not quite. Try again!');
                                     try {
                                       if (wrongAudioRef.current) {
                                         wrongAudioRef.current.currentTime = 0;
@@ -1055,17 +1066,22 @@ const MonetaPlatform = () => {
                                   // free text -> LLM check
                                   if (!uaRaw) {
                                     setCheckMessage('❌ Please enter an answer.');
-                                    setQuestionEvaluatedMap((prev) => ({ ...prev, [qKey]: true }));
-                                    setQuestionCorrectMap((prev) => ({ ...prev, [qKey]: false }));
                                     return;
                                   }
                                   setCheckingFree(true);
                                   checkFree({ question: q, user_answer: uaRaw })
                                     .then((res: FreeCheckResponse) => {
+                                      // Record the answer after the check completes to avoid pre-check re-render quirks
+                                      setAnswer(qKey, uaRaw);
                                       proceed(!!res.correct, res.correct ? '✅ Nice!' : res.feedback || '❌ Try elaborating.');
                                     })
-                                    .catch(() => proceed(false, '❌ Could not check answer. Try again.'))
-                                    .finally(() => setCheckingFree(false));
+                                    .catch(() => {
+                                      setAnswer(qKey, uaRaw);
+                                      proceed(false, '❌ Could not check answer. Try again.');
+                                    })
+                                    .finally(() => {
+                                      setCheckingFree(false);
+                                    });
                                 }
                               }}
                               className={`flex-1 text-white font-black py-4 rounded-2xl transition-colors shadow-md disabled:opacity-50 ${
@@ -1100,16 +1116,24 @@ const MonetaPlatform = () => {
                     );
                   })()}
 
-                  {currentQuestionIdx === totalQuestions - 1 && (
-                  <button
-                    onClick={submitQuiz}
-                      disabled={!generatedLesson || answeredCount < totalQuestions || isSubmitting}
-                      type="button"
-                      className="mt-6 w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-black text-xl py-5 rounded-2xl hover:from-green-600 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed confetti"
-                  >
-                      {isSubmitting ? 'CHECKING...' : 'FINISH' }
-                  </button>
-                  )}
+                  {currentQuestionIdx === totalQuestions - 1 && (() => {
+                    // Check if all questions are marked correct
+                    const allCorrect = generatedLesson?.questions.every((q, idx) => {
+                      const key = (q as any)?.id || `q-${idx}`;
+                      return questionCorrectMap[key];
+                    }) || false;
+                    const canFinish = allCorrect || answeredCount >= totalQuestions;
+                    return (
+                      <button
+                        onClick={submitQuiz}
+                        disabled={!generatedLesson || !canFinish || isSubmitting || checkingFree}
+                        type="button"
+                        className="mt-6 w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-black text-xl py-5 rounded-2xl hover:from-green-600 hover:to-green-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed confetti"
+                      >
+                        {isSubmitting ? 'CHECKING...' : 'FINISH' }
+                      </button>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500">
