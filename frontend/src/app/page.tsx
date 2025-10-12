@@ -12,7 +12,6 @@ import {
   type Lesson as ApiLesson,
   type EvaluateResponse,
   calculateLevel,
-  getMotivationalQuote,
 } from '@/lib/api';
 import { checkFree, type FreeCheckResponse } from '@/lib/api';
 
@@ -248,6 +247,7 @@ const MonetaPlatform = () => {
   // Lesson + quiz state (driven by backend)
   const [generatedLesson, setGeneratedLesson] = useState<ApiLesson | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(false);
+  const [isReviewMode, setIsReviewMode] = useState(false);
 
   // Auth check on mount
   useEffect(() => {
@@ -275,6 +275,7 @@ const MonetaPlatform = () => {
   const liveAnswersRef = useRef<Record<string, string>>({});
   const freeTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const [questionCorrectMap, setQuestionCorrectMap] = useState<Record<string, boolean>>({});
+  const [firstAttemptWrong, setFirstAttemptWrong] = useState<Record<string, boolean>>({}); // Track questions wrong on first attempt
   const [showQuestionConfetti, setShowQuestionConfetti] = useState(false);
   const [globalConfetti, setGlobalConfetti] = useState<{ x: number; y: number; color: string }[]>([]);
   const correctAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -446,26 +447,45 @@ const MonetaPlatform = () => {
     })();
   }, [userData?.username, handleId]); // Re-run when user changes
 
-  // Rotate motivational quotes every 5 seconds
+  // Rotate motivational quotes every 5 seconds (only when not in a lesson)
+  // Using static quotes to avoid API quota issues
   useEffect(() => {
-    const fetchNewQuote = async () => {
-      try {
-        const quote = await getMotivationalQuote();
-        setMotivationalQuote(quote);
-      } catch (error) {
-        console.error('Failed to fetch motivational quote:', error);
-        // Keep the current quote if fetch fails
-      }
+    // Don't update quotes while user is in a lesson to avoid disrupting their focus
+    if (selectedLesson !== null) {
+      return;
+    }
+
+    const staticQuotes = [
+      "Save today, enjoy tomorrow! 💰",
+      "Small savings add up to big dreams! ✨",
+      "Your credit score opens doors! 🚪",
+      "Budget smart, live better! 📊",
+      "Invest in your future self! 🌟",
+      "Every penny counts! 💵",
+      "Build wealth, one step at a time! 🎯",
+      "Smart spending leads to big savings! 🧠",
+      "Your financial goals are within reach! 🎉",
+      "Start saving now, thank yourself later! 🙏",
+      "Track your spending, know your money! 📱",
+      "Financial freedom starts with a plan! 🗺️",
+      "Save first, spend what's left! 💎",
+      "Compound interest is your best friend! 📈",
+      "Budget today, freedom tomorrow! 🦅",
+    ];
+
+    const rotateQuote = () => {
+      const randomQuote = staticQuotes[Math.floor(Math.random() * staticQuotes.length)];
+      setMotivationalQuote(randomQuote);
     };
 
-    // Fetch initial quote
-    fetchNewQuote();
+    // Set initial quote
+    rotateQuote();
 
-    // Set up interval to fetch new quotes
-    const interval = setInterval(fetchNewQuote, 5000); // 5 seconds
+    // Set up interval to rotate quotes
+    const interval = setInterval(rotateQuote, 5000); // 5 seconds
 
     return () => clearInterval(interval);
-  }, []); // Run once on mount and set up interval
+  }, [selectedLesson]); // Re-run when selectedLesson changes
 
   // Lessons path (visual nodes). Content is generated via backend when opened
   const lessons = [
@@ -605,9 +625,37 @@ const MonetaPlatform = () => {
     setUserAnswers({});
     setEvaluation(null);
     setCurrentQuestionIdx(0);
+    setQuestionEvaluatedMap({});
     setQuestionCorrectMap({});
+    setFirstAttemptWrong({});
     setLoadingLesson(true);
+    setIsReviewMode(false);
+    
     try {
+      // Check if there are cached questions for this lesson (questions they got wrong)
+      const cacheKey = `moneta_incorrect_questions_${handleId}_lesson_${lessonId}`;
+      const cachedQuestionsStr = localStorage.getItem(cacheKey);
+      
+      if (cachedQuestionsStr) {
+        try {
+          const cachedLesson = JSON.parse(cachedQuestionsStr);
+          console.log('📚 Using cached questions for review (previously incorrect)');
+          setGeneratedLesson(cachedLesson);
+          setIsReviewMode(true);
+          setLoadingLesson(false);
+          // Reset state maps to ensure clean slate for review mode
+          setQuestionEvaluatedMap({});
+          setQuestionCorrectMap({});
+          setFirstAttemptWrong({});
+          return;
+        } catch (parseError) {
+          console.error('Failed to parse cached questions:', parseError);
+          localStorage.removeItem(cacheKey);
+        }
+      }
+      
+      // No cached questions, generate fresh ones
+      console.log('🆕 Generating fresh questions (no cached incorrect questions found)');
       const category = CATEGORY_MAP[node.category] || node.category;
       const lvl = node.difficulty || 1;
       const diffLabel = lvl === 1 ? 'beginner-friendly' : lvl === 2 ? 'intermediate' : 'advanced';
@@ -648,8 +696,33 @@ const MonetaPlatform = () => {
       });
       setEvaluation(resp);
 
-      // Award XP if passed
+      // Handle question caching based on FIRST ATTEMPT correctness
       const node = lessons.find((l) => l.id === selectedLesson);
+      if (node && generatedLesson) {
+        const cacheKey = `moneta_incorrect_questions_${handleId}_lesson_${node.id}`;
+        
+        // Identify questions that were wrong on the FIRST attempt
+        const incorrectQuestions = generatedLesson.questions.filter((q, idx) => {
+          const qKey = (q as any)?.id || `q-${idx}`;
+          return firstAttemptWrong[qKey] === true;
+        });
+
+        if (incorrectQuestions.length > 0) {
+          // Cache only the questions they got wrong on first attempt for future review
+          const reviewLesson = {
+            ...generatedLesson,
+            questions: incorrectQuestions
+          };
+          localStorage.setItem(cacheKey, JSON.stringify(reviewLesson));
+          console.log(`💾 Cached ${incorrectQuestions.length} questions from first attempts for review`);
+        } else {
+          // All answers correct on first try! Clear any cached questions
+          localStorage.removeItem(cacheKey);
+          console.log('✅ All answers correct on first attempt! Cleared cached questions.');
+        }
+      }
+
+      // Award XP if passed
       if (node && resp.score >= 0.6) {
         const newXp = userProgress.xp + node.xp;
         const updatedCompleted = userProgress.completedLessons.includes(node.id)
@@ -959,6 +1032,19 @@ const MonetaPlatform = () => {
                 </div>
                 <h2 className="text-3xl font-black text-gray-800 dark:text-gray-100 mb-2">{generatedLesson?.title || node.title}</h2>
                 <p className="text-gray-600 dark:text-gray-300 font-semibold">{generatedLesson?.category || node.category}</p>
+                
+                {/* Review Mode Banner */}
+                {isReviewMode && (
+                  <div className="mt-4 bg-orange-100 dark:bg-orange-900 border-2 border-orange-400 dark:border-orange-600 rounded-xl px-4 py-3 flex items-center gap-3 anim-pop-in">
+                    <span className="text-2xl">🔄</span>
+                    <div className="text-left">
+                      <div className="font-black text-orange-800 dark:text-orange-200">Review Mode</div>
+                      <div className="text-sm text-orange-700 dark:text-orange-300">
+                        These are questions you missed previously. Master them to get fresh questions!
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {loadingLesson ? (
@@ -1033,6 +1119,11 @@ const MonetaPlatform = () => {
                                   setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
                                 let isCorrect = false;
                                 const proceed = (ok: boolean, message?: string) => {
+                                  // Track if this is the first attempt and it's wrong
+                                  if (!ok && !questionCorrectMap[qKey] && !firstAttemptWrong[qKey]) {
+                                    setFirstAttemptWrong((prev) => ({ ...prev, [qKey]: true }));
+                                  }
+                                  
                                   // Batch all state updates together
                                   setQuestionEvaluatedMap((prev) => ({ ...prev, [qKey]: true }));
                                   setQuestionCorrectMap((prev) => ({ ...prev, [qKey]: ok }));
@@ -1090,9 +1181,14 @@ const MonetaPlatform = () => {
                                       setAnswer(qKey, uaRaw);
                                       proceed(!!res.correct, res.correct ? '✅ Nice!' : res.feedback || '❌ Try elaborating.');
                                     })
-                                    .catch(() => {
+                                    .catch((error) => {
                                       setAnswer(qKey, uaRaw);
-                                      proceed(false, '❌ Could not check answer. Try again.');
+                                      const errorMsg = error?.message || '';
+                                      if (errorMsg.includes('quota') || errorMsg.includes('429')) {
+                                        proceed(false, '⏳ API limit reached. Please wait a moment and try again.');
+                                      } else {
+                                        proceed(false, '❌ Could not check answer. Try again.');
+                                      }
                                     })
                                     .finally(() => {
                                       setCheckingFree(false);
@@ -1274,11 +1370,6 @@ const MonetaPlatform = () => {
               <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-blue-600">
                 💰 Moneta
               </div>
-              {userData && (
-                <div className="text-sm font-semibold text-gray-600 dark:text-gray-400">
-                  Welcome, {userData.display_name || userData.username}!
-                </div>
-              )}
               {isMounted && isGuest && (
                 <div className="text-sm font-semibold text-gray-500 dark:text-gray-400">
                   (Guest Mode - Progress won&apos;t save)

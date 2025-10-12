@@ -158,7 +158,16 @@ export async function checkFree(params: {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Try to get error details from response
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.detail || errorMessage;
+      } catch (parseError) {
+        // If JSON parsing fails, use the default error message
+        console.warn('Could not parse error response as JSON');
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();

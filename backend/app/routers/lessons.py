@@ -87,9 +87,23 @@ def evaluate_answers(req: EvaluateRequest) -> EvaluateResponse:
 @router.post("/check_free", response_model=FreeCheckResponse)
 def check_free(req: FreeCheckRequest) -> FreeCheckResponse:
     try:
+        print(f"[DEBUG] check_free called with question type: {type(req.question)}, question: {req.question}")
+        print(f"[DEBUG] user_answer: {req.user_answer}")
         ok, feedback = check_free_response(req.question, req.user_answer)
         return FreeCheckResponse(correct=ok, feedback=feedback)
     except Exception as e:
+        import traceback
+        error_str = str(e)
+        print(f"[ERROR] check_free failed: {error_str}")
+        print(traceback.format_exc())
+        
+        # Check if it's a quota error
+        if "429" in error_str or "quota" in error_str.lower() or "ResourceExhausted" in error_str:
+            raise HTTPException(
+                status_code=429, 
+                detail="API quota exceeded. Please try again later or upgrade your API plan."
+            )
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 

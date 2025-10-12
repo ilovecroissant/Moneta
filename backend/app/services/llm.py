@@ -129,20 +129,47 @@ def finance_chat(message: str, context: str | None = None) -> str:
 
 
 def check_free_response(question: Question, user_answer: str) -> Tuple[bool, str]:
-    model = _ensure_model()
-    rubric = (
-        "You are grading a teen's short finance answer. "
-        "Decide if it correctly and succinctly answers the prompt. "
-        "Respond with strict JSON: {\"correct\": boolean, \"feedback\": string}."
-    )
-    prompt = f"{rubric}\nPrompt: {question.prompt}\nStudent: {user_answer}"
-    resp = model.generate_content(prompt)
-    raw = (getattr(resp, "text", "") or "").strip()
+    """Check free response with AI, fallback to keyword matching if quota exceeded."""
+    
+    # Try AI checking first
     try:
-        data = json.loads(_extract_json(raw))
-        return bool(data.get("correct", False)), str(data.get("feedback", ""))
-    except Exception:
-        return False, "Couldn't check your answer. Try again with a clearer response."
+        model = _ensure_model()
+        rubric = (
+            "You are grading a teen's short finance answer. "
+            "Decide if it correctly and succinctly answers the prompt. "
+            "Respond with strict JSON: {\"correct\": boolean, \"feedback\": string}."
+        )
+        prompt = f"{rubric}\nPrompt: {question.prompt}\nStudent: {user_answer}"
+        resp = model.generate_content(prompt)
+        raw = (getattr(resp, "text", "") or "").strip()
+        try:
+            data = json.loads(_extract_json(raw))
+            return bool(data.get("correct", False)), str(data.get("feedback", ""))
+        except Exception:
+            return False, "Couldn't check your answer. Try again with a clearer response."
+    except Exception as e:
+        error_str = str(e)
+        # If quota exceeded, use keyword matching fallback
+        if "429" in error_str or "quota" in error_str.lower() or "ResourceExhausted" in error_str:
+            print("[FALLBACK] Using keyword matching due to API quota limit")
+            # Simple keyword matching based on explanation or correct answer
+            if question.explanation:
+                explanation_lower = question.explanation.lower()
+                answer_lower = user_answer.lower()
+                # Extract key terms from explanation (words longer than 4 chars)
+                key_terms = [word for word in explanation_lower.split() if len(word) > 4 and word.isalpha()]
+                # Check if user answer contains some key terms
+                matches = sum(1 for term in key_terms if term in answer_lower)
+                if matches >= 2:  # At least 2 key terms mentioned
+                    return True, "Good! Your answer includes key concepts."
+                else:
+                    return False, f"Try including key concepts from the hint: {question.hint or 'Review the topic'}"
+            # If no explanation, just accept any non-empty answer
+            if len(user_answer.strip()) > 5:
+                return True, "Answer recorded! (AI grading temporarily unavailable)"
+            return False, "Please provide a more detailed answer."
+        # Re-raise if it's a different error
+        raise
 
 
 def generate_motivational_quote() -> str:
