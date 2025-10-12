@@ -1093,24 +1093,20 @@ const MonetaPlatform = () => {
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              const idxAtClick = currentQuestionIdx;
-                              // Only allow next if this question is marked correct via CHECK
-                              if (questionCorrectMap[qKey]) {
+                          {questionCorrectMap[qKey] && currentQuestionIdx < totalQuestions - 1 && (
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                const idxAtClick = currentQuestionIdx;
                                 setCheckMessage(null);
                                 setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
-                              } else {
-                                setCheckMessage('❌ Please check your answer first.');
-                              }
-                            }}
-                            disabled={currentQuestionIdx >= totalQuestions - 1 || checkingFree || !questionCorrectMap[qKey]}
-                            className={`${questionCorrectMap[qKey] ? 'w-full bg-green-600 text-white text-xl py-5' : 'px-6 bg-gray-100 text-gray-700'} font-bold rounded-2xl border-2 border-gray-200 hover:bg-gray-200 disabled:opacity-50`}
-                          >
-                            NEXT
-                          </button>
+                              }}
+                              className="w-full bg-green-600 text-white text-xl py-5 font-bold rounded-2xl hover:bg-green-700 transition-colors shadow-md"
+                            >
+                              NEXT
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
