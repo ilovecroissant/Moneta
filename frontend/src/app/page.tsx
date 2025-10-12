@@ -254,16 +254,18 @@ const MonetaPlatform = () => {
 
   // Auth check on mount
   useEffect(() => {
-    setIsMounted(true);
     const authToken = localStorage.getItem('authToken');
     const isGuestMode = localStorage.getItem('isGuest') === 'true';
     const savedUserData = localStorage.getItem('userData');
     
+    // Redirect to login if not authenticated
     if (!authToken && !isGuestMode) {
       router.push('/login');
       return;
     }
     
+    // Only set mounted if authenticated
+    setIsMounted(true);
     setIsGuest(isGuestMode);
     if (savedUserData) {
       setUserData(JSON.parse(savedUserData));
@@ -1374,8 +1376,17 @@ const MonetaPlatform = () => {
                 💰 Moneta
               </div>
               {isMounted && isGuest && (
-                <div className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                  (Guest Mode - Progress won&apos;t save)
+                <div className="flex items-center gap-3">
+                  <div className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                    (Guest Mode - Progress won&apos;t save)
+                  </div>
+                  <button
+                    onClick={() => router.push('/login')}
+                    className="bg-gradient-to-r from-green-500 to-blue-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:from-green-600 hover:to-blue-700 transition-all border-b-4 border-blue-700 shadow-md"
+                    style={{ boxShadow: '0 4px 0 #1d4ed8, 0 6px 12px rgba(37, 99, 235, 0.3)' }}
+                  >
+                    Create Account
+                  </button>
                 </div>
               )}
             </div>
