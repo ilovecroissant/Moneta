@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlmodel import select
+from datetime import datetime, timedelta
 
 from ..db import get_session
-from ..models import User, UserProgressRecord
+from ..models import User, UserProgressRecord, XPEvent
 from ..schemas import Progress
 
 
@@ -64,13 +65,25 @@ def get_progress(handle: str) -> Progress:
     if user.completed_lessons:
         completed_lessons = [int(x) for x in user.completed_lessons.split(",") if x.strip()]
     
+    # Compute today's XP from XPEvent
+    start_of_day = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    with get_session() as session:
+        events = session.exec(
+            select(XPEvent).where(
+                XPEvent.user_id == user.id,
+                XPEvent.created_at >= start_of_day,
+            )
+        ).all()
+    daily_xp = sum(e.xp_delta for e in events)
+
     # Return XP, streak, and completed lessons from User table (authoritative source)
     return Progress(
         handle=handle, 
         xp=user.xp, 
         streak=user.streak, 
         unlocked=unlocked,
-        completed_lessons=completed_lessons
+        completed_lessons=completed_lessons,
+        daily_xp=daily_xp,
     )
 
 
@@ -83,8 +96,15 @@ def set_progress(handle: str, body: ProgressUpdate) -> Progress:
         user_db = session.get(User, user.id)
         
         if body.xp is not None:
-            rec.xp = body.xp
-            user_db.xp = body.xp  # Also update User table
+            # Log XP delta if increased
+            old_xp = user_db.xp or 0
+            new_xp = body.xp
+            rec.xp = new_xp
+            user_db.xp = new_xp  # Also update User table
+            delta = (new_xp or 0) - (old_xp or 0)
+            if delta > 0:
+                xp_event = XPEvent(user_id=user_db.id, xp_delta=delta)
+                session.add(xp_event)
         if body.streak is not None:
             rec.streak = body.streak
             user_db.streak = body.streak  # Also update User table
@@ -106,12 +126,24 @@ def set_progress(handle: str, body: ProgressUpdate) -> Progress:
     if user_db.completed_lessons:
         completed_lessons = [int(x) for x in user_db.completed_lessons.split(",") if x.strip()]
     
+    # Compute today's XP for response
+    start_of_day = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    with get_session() as session:
+        events = session.exec(
+            select(XPEvent).where(
+                XPEvent.user_id == user_db.id,
+                XPEvent.created_at >= start_of_day,
+            )
+        ).all()
+    daily_xp = sum(e.xp_delta for e in events)
+
     return Progress(
         handle=handle, 
         xp=rec.xp, 
         streak=rec.streak, 
         unlocked=unlocked,
-        completed_lessons=completed_lessons
+        completed_lessons=completed_lessons,
+        daily_xp=daily_xp,
     )
 
 

@@ -1,15 +1,25 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+export interface ChoiceOption {
+  id: string;
+  text: string;
+}
+
+export interface Question {
+  id: string;
+  type: 'mcq' | 'fill' | 'free';
+  prompt: string;
+  options?: ChoiceOption[];
+  correct_answer?: string;
+  hint?: string;
+  explanation?: string;
+}
+
 export interface Lesson {
+  title: string;
   category: string;
-  topic: string;
-  lesson_content: string;
-  questions: Array<{
-    question: string;
-    options: string[];
-    correct_answer: string;
-    explanation: string;
-  }>;
+  level: number;
+  questions: Question[];
 }
 
 export type { Lesson as ApiLesson };
@@ -32,13 +42,12 @@ export interface FreeCheckResponse {
   feedback?: string;
 }
 
-export interface ProgressData {
+export interface ProgressResponse {
   xp: number;
-  level: number;
   streak: number;
-  daily_goal: number;
-  daily_progress: number;
-  completed_lessons: string[];
+  unlocked: string[];
+  completed_lessons: number[];
+  daily_xp: number;
 }
 
 // Chat API
@@ -159,7 +168,7 @@ export async function checkFree(params: {
 }
 
 // Get Progress from backend
-export async function getProgress(handle: string): Promise<{ xp: number; streak: number; unlocked: string[] }> {
+export async function getProgress(handle: string): Promise<ProgressResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/progress/${handle}`, {
       method: 'GET',
@@ -173,16 +182,16 @@ export async function getProgress(handle: string): Promise<{ xp: number; streak:
     }
 
     const data = await response.json();
-    return data;
+    return data as ProgressResponse;
   } catch (error) {
     console.error('Get progress API error:', error);
     // Return default if backend fails
-    return { xp: 0, streak: 0, unlocked: [] };
+    return { xp: 0, streak: 0, unlocked: [], completed_lessons: [], daily_xp: 0 };
   }
 }
 
 // Set Progress to backend
-export async function setProgress(handle: string, update: { xp?: number; streak?: number }): Promise<{ xp: number; streak: number; unlocked: string[] }> {
+export async function setProgress(handle: string, update: { xp?: number; streak?: number; completed_lessons?: number[] }): Promise<ProgressResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/progress/${handle}`, {
       method: 'POST',
@@ -197,7 +206,7 @@ export async function setProgress(handle: string, update: { xp?: number; streak?
     }
 
     const data = await response.json();
-    return data;
+    return data as ProgressResponse;
   } catch (error) {
     console.error('Set progress API error:', error);
     throw error;

@@ -11,6 +11,7 @@ import {
   setProgress,
   type Lesson as ApiLesson,
   type EvaluateResponse,
+  calculateLevel,
 } from '@/lib/api';
 import { checkFree, type FreeCheckResponse } from '@/lib/api';
 
@@ -159,7 +160,7 @@ const MonetaPlatform = () => {
   // Get user handle from authenticated user data
   const handleId = userData?.username || 'demo';
 
-  // User progress data (xp/streak from backend; daily fields are UI-only)
+  // User progress data (xp/streak from backend; daily xp from backend)
   const [userProgress, setUserProgress] = useState({
     xp: 0,
     level: 1,
@@ -197,11 +198,37 @@ const MonetaPlatform = () => {
     (async () => {
       try {
         const p = await getProgress(handleId);
-        setUserProgress((prev) => ({
-          ...prev,
+        const completedFromBackend = Array.isArray(p.completed_lessons) ? p.completed_lessons : [];
+        let inferredCompleted: number[] = completedFromBackend;
+        if (completedFromBackend.length === 0 && typeof p.xp === 'number' && p.xp > 0) {
+          let remainingXp = p.xp;
+          const calc: number[] = [];
+          for (const l of lessons) {
+            if (remainingXp >= l.xp) {
+              calc.push(l.id);
+              remainingXp -= l.xp;
+            } else {
+              break;
+            }
+          }
+          inferredCompleted = calc;
+        }
+
+        const updatedProgress = {
+          ...userProgress,
           xp: p.xp,
+          level: calculateLevel(p.xp),
           streak: p.streak,
-        }));
+          completedLessons: inferredCompleted,
+          dailyProgress: p.daily_xp || 0,
+        };
+        setUserProgress(updatedProgress);
+        // If backend has no completed lessons but we inferred some, persist them
+        if ((p.completed_lessons?.length || 0) === 0 && inferredCompleted.length > 0) {
+          try {
+            await setProgress(handleId, { xp: p.xp, streak: p.streak, completed_lessons: inferredCompleted });
+          } catch (_) {}
+        }
         setProgressUnlocked(p.unlocked || []);
       } catch (e) {
         // best-effort: keep defaults when backend not available
@@ -381,18 +408,26 @@ const MonetaPlatform = () => {
       const node = lessons.find((l) => l.id === selectedLesson);
       if (node && resp.score >= 0.6) {
         const newXp = userProgress.xp + node.xp;
+        const updatedCompleted = userProgress.completedLessons.includes(node.id)
+          ? userProgress.completedLessons
+          : [...userProgress.completedLessons, node.id];
         const { streak: maybeNewStreak } = await maybeIncrementStreakForToday(newXp, node.xp);
+        // Persist xp/streak and completed lessons to backend
+        let savedDailyXp = userProgress.dailyProgress + node.xp;
+        try {
+          const saved = await setProgress(handleId, { xp: newXp, streak: maybeNewStreak, completed_lessons: updatedCompleted });
+          if (typeof saved?.daily_xp === 'number') savedDailyXp = saved.daily_xp;
+        } catch (_) {}
         setUserProgress((prev) => ({
-        ...prev,
+          ...prev,
           xp: newXp,
+          level: calculateLevel(newXp),
           streak: maybeNewStreak,
-          completedLessons: prev.completedLessons.includes(node.id)
-            ? prev.completedLessons
-            : [...prev.completedLessons, node.id],
-          dailyProgress: prev.dailyProgress + node.xp,
-      }));
-      setShowCelebration(true);
-      setTimeout(() => setShowCelebration(false), 3000);
+          completedLessons: updatedCompleted,
+          dailyProgress: savedDailyXp,
+        }));
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 3000);
       }
     } catch (e) {
       // ignore for MVP
@@ -485,89 +520,101 @@ const MonetaPlatform = () => {
         <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-green-300 via-blue-300 to-purple-300 opacity-30 transform -translate-x-1/2"></div>
 
         <div className="relative">
-          {lessons.map((lesson, index) => {
-            const isCompleted = userProgress.completedLessons.includes(lesson.id);
-            // Sequential unlock: first lesson always unlocked, others unlock after completing previous
-            const isLocked = index > 0 && !userProgress.completedLessons.includes(lessons[index - 1].id);
-            const isNext = !isCompleted && !isLocked;
-            
-            return (
-              <div
-                key={lesson.id}
-                className="relative mb-8"
-                style={{
-                  marginLeft: `${lesson.position.x}%`,
-                  transform: `translateX(-50%)`
-                }}
-              >
-                {/* Connecting line to next lesson */}
-                {index < lessons.length - 1 && (
-                  <div className="absolute top-20 left-1/2 w-1 h-16 bg-gradient-to-b from-gray-300 to-transparent transform -translate-x-1/2"></div>
-                )}
-
-                <button
-                  onClick={() => !isLocked && openLesson(lesson.id)}
-                  type="button"
-                  disabled={isLocked}
-                  className={`relative group transition-all duration-300 ${
-                    isLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-110'
-                  }`}
+          {(() => {
+            const firstAccessibleIndex = lessons.findIndex((l) => {
+              const reqLevel = l.difficulty || 1;
+              const meetsLvl = userProgress.level >= reqLevel;
+              const completed = userProgress.completedLessons.includes(l.id);
+              return !completed && meetsLvl;
+            });
+            return lessons.map((lesson, index) => {
+              const isCompleted = userProgress.completedLessons.includes(lesson.id);
+              const requiredLevel = lesson.difficulty || 1;
+              const meetsLevel = userProgress.level >= requiredLevel;
+              const isPrimaryNext = !isCompleted && meetsLevel && index === firstAccessibleIndex;
+              const isLocked = !isCompleted && (!meetsLevel || !isPrimaryNext);
+              const isNext = isPrimaryNext;
+              const requiredXP = Math.max(0, (requiredLevel - 1) * 100);
+              const neededXP = Math.max(0, requiredXP - userProgress.xp);
+              
+              return (
+                <div
+                  key={lesson.id}
+                  className="relative mb-8"
+                  style={{
+                    marginLeft: `${lesson.position.x}%`,
+                    transform: `translateX(-50%)`
+                  }}
                 >
-                  {/* Lesson Circle */}
-                  <div className={`relative w-20 h-20 rounded-full flex items-center justify-center text-4xl shadow-lg border-4 transition-all ${
-                    isLocked
-                      ? 'bg-gray-300 border-gray-400'
-                      : isCompleted
-                      ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-600 anim-pop-in'
-                      : isNext
-                      ? 'bg-gradient-to-br ' + lesson.color + ' border-white anim-bounce anim-pulse-ring'
-                      : 'bg-white border-gray-300'
-                  }`}>
-                    {isLocked ? (
-                      <Lock className="w-8 h-8 text-gray-500" />
-                    ) : isCompleted ? (
-                      <CheckCircle className="w-10 h-10 text-white" />
-                    ) : (
-                      <span>{lesson.icon}</span>
-                    )}
-                    
-                    {/* Glow effect for next lesson */}
-                    {isNext && (
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-400 to-green-500 opacity-30 blur-md animate-pulse"></div>
-                    )}
-                  </div>
-
-                  {/* Stars for completed lessons */}
-                  {isCompleted && (
-                    <div className="absolute -top-2 -right-2">
-                      <div className="bg-amber-400 rounded-full p-1 border-2 border-white shadow-md">
-                        <Star className="w-4 h-4 text-white fill-white" />
-                      </div>
-                    </div>
+                  {/* Connecting line to next lesson */}
+                  {index < lessons.length - 1 && (
+                    <div className="absolute top-20 left-1/2 w-1 h-16 bg-gradient-to-b from-gray-300 to-transparent transform -translate-x-1/2"></div>
                   )}
 
-                  {/* Lesson Info Tooltip */}
-                  <div className={`absolute top-full mt-4 left-1/2 transform -translate-x-1/2 transition-all ${
-                    isLocked ? 'opacity-60' : ''
-                  }`}>
-                    <div className="bg-white rounded-2xl p-4 shadow-xl border-2 border-gray-100 min-w-48 text-center">
-                      <div className="font-black text-gray-800 text-sm mb-1">
-                        {lesson.title}
+                  <button
+                    onClick={() => !isLocked && openLesson(lesson.id)}
+                    type="button"
+                    disabled={isLocked}
+                    className={`relative group transition-all duration-300 ${
+                      isLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-110'
+                    }`}
+                  >
+                    {/* Lesson Circle */}
+                    <div className={`relative w-20 h-20 rounded-full flex items-center justify-center text-4xl shadow-lg border-4 transition-all ${
+                      isLocked
+                        ? 'bg-gray-300 border-gray-400'
+                        : isCompleted
+                        ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-600 anim-pop-in'
+                        : isNext
+                        ? 'bg-gradient-to-br ' + lesson.color + ' border-white anim-bounce anim-pulse-ring'
+                        : 'bg-white border-gray-300'
+                    }`}>
+                      {isLocked ? (
+                        <Lock className="w-8 h-8 text-gray-500" />
+                      ) : isCompleted ? (
+                        <CheckCircle className="w-10 h-10 text-white" />
+                      ) : (
+                        <span>{lesson.icon}</span>
+                      )}
+                      
+                      {/* Glow effect for next lesson */}
+                      {isNext && (
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-400 to-green-500 opacity-30 blur-md animate-pulse"></div>
+                      )}
+                    </div>
+
+                    {/* Stars for completed lessons */}
+                    {isCompleted && (
+                      <div className="absolute -top-2 -right-2">
+                        <div className="bg-amber-400 rounded-full p-1 border-2 border-white shadow-md">
+                          <Star className="w-4 h-4 text-white fill-white" />
+                        </div>
                       </div>
-                      <div className="flex items-center justify-center gap-2 text-xs">
-                        <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold">
-                          {lesson.xp} XP
-                        </span>
-                        {isLocked && (
-                          <span className="text-gray-500 font-semibold">🔒 Locked</span>
-                        )}
+                    )}
+
+                    {/* Lesson Info Tooltip */}
+                    <div className={`absolute top-full mt-4 left-1/2 transform -translate-x-1/2 transition-all ${
+                      isLocked ? 'opacity-60' : ''
+                    }`}>
+                      <div className="bg-white rounded-2xl p-4 shadow-xl border-2 border-gray-100 min-w-48 text-center">
+                        <div className="font-black text-gray-800 text-sm mb-1">
+                          {lesson.title}
+                        </div>
+                        <div className="flex items-center justify-center gap-2 text-xs">
+                          <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold">
+                            {neededXP > 0 ? `Needs ${neededXP} XP` : 'Ready'}
+                          </span>
+                          {isLocked && (
+                            <span className="text-gray-500 font-semibold">🔒 Locked</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              </div>
-            );
-          })}
+                  </button>
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {/* Bottom Trophy */}
@@ -834,7 +881,9 @@ const MonetaPlatform = () => {
               <div className="bg-gradient-to-br from-amber-400 to-amber-500 rounded-3xl p-8 text-white shadow-xl mt-8">
                 <div className="text-7xl mb-4">🎉</div>
                 <h3 className="text-3xl font-black mb-2">Awesome!</h3>
-                <p className="text-xl font-bold mb-6">+{lessons.find((l) => l.id === selectedLesson)?.xp || 0} XP</p>
+                <p className="text-xl font-bold mb-6">
+                  Level {lessons.find((l) => l.id === selectedLesson)?.difficulty || 1}
+                </p>
                 <button
                   onClick={() => {
                     setSelectedLesson(null);
