@@ -73,35 +73,37 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-400 via-blue-500 to-purple-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center p-4">
+      <div className="duo-card p-8 w-full max-w-md anim-bounce-in">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-blue-600 mb-2">
             💰 Moneta
           </div>
-          <p className="text-gray-600 font-semibold">Master Your Money</p>
+          <p className="text-gray-600 dark:text-gray-400 font-semibold">Master Your Money</p>
         </div>
 
         {/* Mode Toggle */}
-        <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-xl">
+        <div className="flex gap-2 mb-6 bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
           <button
             onClick={() => setMode('login')}
-            className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+            className={`flex-1 py-3 rounded-lg font-extrabold transition-all ${
               mode === 'login'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-blue-500 text-white shadow-md border-b-4 border-blue-700 hover:bg-blue-600'
+                : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
             }`}
+            style={mode === 'login' ? { boxShadow: '0 4px 0 #1d4ed8' } : {}}
           >
             Login
           </button>
           <button
             onClick={() => setMode('signup')}
-            className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+            className={`flex-1 py-3 rounded-lg font-extrabold transition-all ${
               mode === 'signup'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-blue-500 text-white shadow-md border-b-4 border-blue-700 hover:bg-blue-600'
+                : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
             }`}
+            style={mode === 'signup' ? { boxShadow: '0 4px 0 #1d4ed8' } : {}}
           >
             Sign Up
           </button>
@@ -109,7 +111,7 @@ export default function LoginPage() {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border-2 border-red-300 rounded-xl text-red-700 font-semibold text-sm">
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 border-2 border-red-300 dark:border-red-700 rounded-xl text-red-700 dark:text-red-200 font-semibold text-sm">
             {error}
           </div>
         )}
@@ -118,7 +120,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'login' ? (
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
+              <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                 Username or Email
               </label>
               <input
@@ -126,14 +128,14 @@ export default function LoginPage() {
                 value={usernameOrEmail}
                 onChange={(e) => setUsernameOrEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-black"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500"
                 placeholder="Enter username or email"
               />
             </div>
           ) : (
             <>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                   Username
                 </label>
                 <input
@@ -141,13 +143,13 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-black"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500"
                   placeholder="Choose a username"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                   Email
                 </label>
                 <input
@@ -155,7 +157,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-black"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500"
                   placeholder="Enter your email"
                 />
               </div>
@@ -163,7 +165,7 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
+            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
               Password
             </label>
             <input
@@ -172,7 +174,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-black"
+              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500"
               placeholder="Enter your password"
             />
             {mode === 'login' && (
@@ -180,7 +182,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => router.push('/reset-password')}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold"
                 >
                   Forgot Password?
                 </button>
@@ -191,7 +193,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-green-500 to-blue-600 text-white font-black py-4 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="duo-btn w-full py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Please wait...' : mode === 'login' ? 'Login' : 'Sign Up'}
           </button>
@@ -200,17 +202,18 @@ export default function LoginPage() {
         {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
+            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-white text-gray-500 font-semibold">OR</span>
+            <span className="px-4 bg-white dark:bg-slate-800 text-gray-500 dark:text-gray-400 font-semibold">OR</span>
           </div>
         </div>
 
         {/* Google Sign In */}
         <button
           onClick={handleGoogleLogin}
-          className="w-full bg-white border-2 border-gray-300 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2 mb-4"
+          className="w-full bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-bold py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-600 transition-all flex items-center justify-center gap-2 mb-4 shadow-md"
+          style={{ boxShadow: '0 3px 0 #d1d5db, 0 6px 12px rgba(0, 0, 0, 0.1)' }}
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
@@ -236,11 +239,12 @@ export default function LoginPage() {
         {/* Guest Mode */}
         <button
           onClick={handleGuestMode}
-          className="w-full bg-gray-200 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-300 transition-all"
+          className="w-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-3 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-all border-b-4 border-gray-400 dark:border-gray-800 shadow-md"
+          style={{ boxShadow: '0 4px 0 #9ca3af, 0 6px 12px rgba(0, 0, 0, 0.1)' }}
         >
           Continue as Guest
         </button>
-        <p className="text-center text-sm text-gray-500 mt-2 font-semibold">
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2 font-semibold">
           Guest mode: Progress won't be saved
         </p>
       </div>

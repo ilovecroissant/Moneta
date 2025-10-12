@@ -791,9 +791,6 @@ const MonetaPlatform = () => {
 
       {/* Learning Path - Duolingo Style */}
       <div className="relative min-h-screen pb-20">
-        {/* Vertical Path Line */}
-        <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-green-300 via-blue-300 to-purple-300 opacity-30 transform -translate-x-1/2"></div>
-
         <div className="relative">
           {(() => {
             const firstAccessibleIndex = lessons.findIndex((l) => {
@@ -821,11 +818,6 @@ const MonetaPlatform = () => {
                     transform: `translateX(-50%)`
                   }}
                 >
-                  {/* Connecting line to next lesson */}
-                  {index < lessons.length - 1 && (
-                    <div className="absolute top-20 left-1/2 w-1 h-16 bg-gradient-to-b from-gray-300 to-transparent transform -translate-x-1/2"></div>
-                  )}
-
                   <button
                     onClick={() => !isLocked && openLesson(lesson.id)}
                     type="button"
@@ -904,6 +896,7 @@ const MonetaPlatform = () => {
     if (!node) return null;
     const [checkMessage, setCheckMessage] = useState<string | null>(null);
     const [checkingFree, setCheckingFree] = useState(false);
+    const [showCheckAnimation, setShowCheckAnimation] = useState(false);
 
     const totalQuestions = generatedLesson?.questions.length || 0;
     const answeredCount = useMemo(() => {
@@ -926,7 +919,7 @@ const MonetaPlatform = () => {
           />
         </div>
 
-        <div className="duo-card p-8 anim-bounce-in">
+        <div className="duo-card p-8">
           {!evaluation ? (
             <>
               <div className="text-center mb-8">
@@ -957,7 +950,7 @@ const MonetaPlatform = () => {
                     const qKey = (q as any)?.id || `q-${currentQuestionIdx}`;
                     if (!q) return null;
                     return (
-                      <div key={`${qKey}-${currentQuestionIdx}`} className={`space-y-4 relative ${questionEvaluatedMap[qKey] && !questionCorrectMap[qKey] ? 'anim-red-flash' : ''}`}>
+                      <div key={`${qKey}-${currentQuestionIdx}`} className={`space-y-4 relative ${showCheckAnimation ? 'anim-bounce-in' : ''}`}>
                         {showQuestionConfetti && (
                           <div className="absolute inset-0 pointer-events-none flex items-start justify-end p-4">
                             <div className="confetti"></div>
@@ -1021,6 +1014,10 @@ const MonetaPlatform = () => {
                                   setQuestionEvaluatedMap((prev) => ({ ...prev, [qKey]: true }));
                                   setQuestionCorrectMap((prev) => ({ ...prev, [qKey]: ok }));
                                   setCheckMessage(message || (ok ? '✅ Correct!' : '❌ Not quite. Try again!'));
+                                  
+                                  // Trigger bounce animation once
+                                  setShowCheckAnimation(true);
+                                  setTimeout(() => setShowCheckAnimation(false), 600);
                                   
                                   if (ok) {
                                     setShowQuestionConfetti(true);
@@ -1102,7 +1099,7 @@ const MonetaPlatform = () => {
                                 setCheckMessage(null);
                                 setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
                               }}
-                              className="duo-btn w-full text-xl py-5 anim-success-burst"
+                              className="duo-btn w-full text-xl py-5"
                             >
                               NEXT
                             </button>
