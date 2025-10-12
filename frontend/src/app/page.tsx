@@ -20,13 +20,15 @@ const CATEGORY_MAP: Record<string, string> = {
 };
 
 // Memoized question component to prevent re-renders
-const QuestionInput = memo(({ question, value, onChange, onLiveChange }: { 
+const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegisterRef }: { 
   question: any; 
   value: string; 
   onChange: (val: string) => void;
   onLiveChange?: (val: string) => void;
+  onRegisterRef?: (el: HTMLTextAreaElement | null) => void;
 }) => {
   const [localValue, setLocalValue] = useState(value);
+  const freeRef = React.useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setLocalValue(value);
@@ -78,9 +80,17 @@ const QuestionInput = memo(({ question, value, onChange, onLiveChange }: {
   if (question.type === 'free') {
     return (
       <textarea
-        value={localValue}
-        onChange={(e) => { const v = e.target.value; setLocalValue(v); onLiveChange && onLiveChange(v); }}
-        onBlur={handleBlur}
+        ref={(el) => { freeRef.current = el; onRegisterRef && onRegisterRef(el); }}
+        key={`free-${question.id || 'q'}`}
+        defaultValue={value}
+        onInput={(e) => {
+          const val = (e.target as HTMLTextAreaElement).value;
+          onLiveChange && onLiveChange(val);
+        }}
+        onBlur={() => {
+          const val = freeRef.current?.value || '';
+          onChange(val);
+        }}
         placeholder="Explain in your own words..."
         className="w-full border-2 border-gray-300 rounded-2xl px-4 py-4 font-semibold text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
         rows={4}
@@ -113,7 +123,13 @@ const FinLitPlatform = () => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const liveAnswersRef = useRef<Record<string, string>>({});
+  const freeTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const [questionCorrectMap, setQuestionCorrectMap] = useState<Record<string, boolean>>({});
+  const [showQuestionConfetti, setShowQuestionConfetti] = useState(false);
+  const [globalConfetti, setGlobalConfetti] = useState<{ x: number; y: number; color: string }[]>([]);
+  const correctAudioRef = useRef<HTMLAudioElement | null>(null);
+  const wrongAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [questionEvaluatedMap, setQuestionEvaluatedMap] = useState<Record<string, boolean>>({});
 
   // Basic demo handle for progress
   const handleId = 'demo';
@@ -309,6 +325,8 @@ const FinLitPlatform = () => {
 
   const setAnswer = (questionId: string, value: string) => {
     setUserAnswers((prev) => ({ ...prev, [questionId]: value }));
+    liveAnswersRef.current[questionId] = value;
+    // Don't clear evaluated/correct state here; CHECK will update them
   };
 
   const submitQuiz = async () => {
@@ -574,19 +592,38 @@ const FinLitPlatform = () => {
                 <div className="space-y-8">
                   {(() => {
                     const q = generatedLesson.questions[currentQuestionIdx];
+                    const qKey = (q as any)?.id || `q-${currentQuestionIdx}`;
                     if (!q) return null;
                     return (
-                      <div key={`${q.id}-${currentQuestionIdx}`} className="space-y-4">
+                      <div key={`${qKey}-${currentQuestionIdx}`} className={`space-y-4 relative ${questionEvaluatedMap[qKey] && !questionCorrectMap[qKey] ? 'anim-red-flash' : ''}`}>
+                        {showQuestionConfetti && (
+                          <div className="absolute inset-0 pointer-events-none flex items-start justify-end p-4">
+                            <div className="confetti"></div>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           <h3 className="text-2xl font-bold text-gray-800 leading-snug">{q.prompt}</h3>
-                          <span className="text-sm font-semibold text-gray-500">{currentQuestionIdx + 1}/{totalQuestions}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-500">{currentQuestionIdx + 1}/{totalQuestions}</span>
+                            {questionEvaluatedMap[qKey] && (
+                              questionCorrectMap[qKey]
+                                ? <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-black">Correct</span>
+                                : <span className="px-2 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-black flex items-center gap-1"><span className="x-pop">❌</span> Incorrect</span>
+                            )}
+                          </div>
                         </div>
 
                         <QuestionInput 
                           question={q}
-                          value={userAnswers[q.id] || ''}
-                          onChange={(val) => setAnswer(q.id, val)}
-                          onLiveChange={(val) => { liveAnswersRef.current[q.id] = val; }}
+                          value={userAnswers[qKey] || ''}
+                          onChange={(val) => {
+                            setAnswer(qKey, val);
+                            setQuestionEvaluatedMap((prev) => ({ ...prev, [qKey]: false }));
+                            setQuestionCorrectMap((prev) => ({ ...prev, [qKey]: false }));
+                            setCheckMessage(null);
+                          }}
+                          onLiveChange={(val) => { liveAnswersRef.current[qKey] = val; }}
+                          onRegisterRef={(el) => { freeTextareaRefs.current[qKey] = el; }}
                         />
 
                         {q.hint && (
@@ -594,69 +631,90 @@ const FinLitPlatform = () => {
                         )}
 
                         {checkMessage && (
-                          <div className={`text-sm font-bold ${checkMessage.startsWith('✅') ? 'text-green-700' : 'text-red-700'}`}>{checkMessage}</div>
+                          <div className={`text-sm font-bold ${checkMessage.startsWith('✅') ? 'text-green-700' : checkMessage.startsWith('❌') ? 'text-rose-700' : 'text-gray-600'}`}>{checkMessage}</div>
                         )}
 
                         <div className="flex gap-3 pt-2">
-                          <button
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              setCheckMessage(null);
-                              // Capture current index to guard against async updates
-                              const idxAtClick = currentQuestionIdx;
-                              // Evaluate current question only
-                              const uaRaw = (liveAnswersRef.current[q.id] ?? userAnswers[q.id] ?? '').trim();
-                              const caRaw = (q.correct_answer || '').trim();
-                              const ua = uaRaw.toUpperCase();
-                              const ca = caRaw.toUpperCase();
-                              const advanceIfSame = () =>
-                                setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
-                              let isCorrect = false;
-                              const proceed = (ok: boolean, message?: string) => {
-                                setQuestionCorrectMap((prev) => ({ ...prev, [q.id]: ok }));
-                                if (ok) {
-                                  setCheckMessage(message || '✅ Correct!');
-                                  setTimeout(() => {
-                                    setCheckMessage(null);
-                                    advanceIfSame();
-                                  }, 600);
-                                } else {
-                                  setCheckMessage(message || '❌ Not quite. Try again!');
-                                }
-                              };
+                          {!questionCorrectMap[qKey] && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCheckMessage('Checking…');
+                               // Capture current index to guard against async updates
+                               const idxAtClick = currentQuestionIdx;
+                               // Evaluate current question only
+                               const uaRaw = (freeTextareaRefs.current[qKey]?.value ?? liveAnswersRef.current[qKey] ?? userAnswers[qKey] ?? '').trim();
+                                const caRaw = (q.correct_answer || '').trim();
+                                const ua = uaRaw.toUpperCase();
+                                const ca = caRaw.toUpperCase();
+                                const advanceIfSame = () =>
+                                  setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
+                                let isCorrect = false;
+                                const proceed = (ok: boolean, message?: string) => {
+                                  setQuestionEvaluatedMap((prev) => ({ ...prev, [qKey]: true }));
+                                  setQuestionCorrectMap((prev) => ({ ...prev, [qKey]: ok }));
+                                  if (ok) {
+                                    setCheckMessage(message || '✅ Correct!');
+                                    setShowQuestionConfetti(true);
+                                    setTimeout(() => setShowQuestionConfetti(false), 1000);
+                                    // play sound and spawn confetti dots
+                                    try {
+                                      if (correctAudioRef.current) {
+                                        correctAudioRef.current.currentTime = 0;
+                                        correctAudioRef.current.play().catch(() => {});
+                                      }
+                                    } catch {}
+                                    const dots = Array.from({ length: 24 }).map(() => ({
+                                      x: Math.random() * window.innerWidth,
+                                      y: Math.random() * window.innerHeight * 0.4,
+                                      color: Math.random() > 0.5 ? '#22c55e' : '#f59e0b',
+                                    }));
+                                    setGlobalConfetti(dots);
+                                    setTimeout(() => setGlobalConfetti([]), 1000);
+                                  } else {
+                                    setCheckMessage(message || '❌ Not quite. Try again!');
+                                    try {
+                                      if (wrongAudioRef.current) {
+                                        wrongAudioRef.current.currentTime = 0;
+                                        wrongAudioRef.current.play().catch(() => {});
+                                      }
+                                    } catch {}
+                                  }
+                                };
 
-                              if (q.type === 'mcq') {
-                                isCorrect = ua !== '' && ca !== '' && ua === ca;
-                                proceed(isCorrect);
-                              } else if (q.type === 'fill') {
-                                const normUa = uaRaw.toLowerCase();
-                                const normCa = caRaw.toLowerCase();
-                                isCorrect = normCa !== '' && (normUa === normCa || normUa.includes(normCa) || normCa.includes(normUa));
-                                proceed(isCorrect);
-                              } else {
-                                // free text -> LLM check
-                                if (!uaRaw) {
-                                  setCheckMessage('❌ Please enter an answer.');
-                                  setQuestionCorrectMap((prev) => ({ ...prev, [q.id]: false }));
-                                  return;
+                                if (q.type === 'mcq') {
+                                  isCorrect = ua !== '' && ca !== '' && ua === ca;
+                                  proceed(isCorrect);
+                                } else if (q.type === 'fill') {
+                                  const normUa = uaRaw.toLowerCase();
+                                  const normCa = caRaw.toLowerCase();
+                                  isCorrect = normCa !== '' && (normUa === normCa || normUa.includes(normCa) || normCa.includes(normUa));
+                                  proceed(isCorrect);
+                                } else {
+                                  // free text -> LLM check
+                                  if (!uaRaw) {
+                                    setCheckMessage('❌ Please enter an answer.');
+                                    setQuestionEvaluatedMap((prev) => ({ ...prev, [qKey]: true }));
+                                    setQuestionCorrectMap((prev) => ({ ...prev, [qKey]: false }));
+                                    return;
+                                  }
+                                  setCheckingFree(true);
+                                  checkFree({ question: q, user_answer: uaRaw })
+                                    .then((res: FreeCheckResponse) => {
+                                      proceed(!!res.correct, res.correct ? '✅ Nice!' : res.feedback || '❌ Try elaborating.');
+                                    })
+                                    .catch(() => proceed(false, '❌ Could not check answer. Try again.'))
+                                    .finally(() => setCheckingFree(false));
                                 }
-                                setCheckingFree(true);
-                                checkFree({ question: q, user_answer: uaRaw })
-                                  .then((res: FreeCheckResponse) => {
-                                    proceed(!!res.correct, res.correct ? '✅ Nice!' : res.feedback || '❌ Try elaborating.');
-                                  })
-                                  .catch(() => proceed(false, '❌ Could not check answer. Try again.'))
-                                  .finally(() => setCheckingFree(false));
-                              }
-                            }}
-                            className={`flex-1 text-white font-black py-4 rounded-2xl transition-colors shadow-md disabled:opacity-50 ${
-                              checkMessage && checkMessage.startsWith('❌') ? 'bg-rose-500 hover:bg-rose-600' : 'bg-sky-600 hover:bg-sky-700'
-                            }`}
-                            disabled={checkingFree}
-                          >
-                            {checkingFree ? 'CHECKING…' : 'CHECK'}
-                          </button>
+                              }}
+                              className={`flex-1 text-white font-black py-4 rounded-2xl transition-colors shadow-md disabled:opacity-50 ${
+                                checkMessage && checkMessage.startsWith('❌') ? 'bg-rose-500 hover:bg-rose-600' : 'bg-sky-600 hover:bg-sky-700'
+                              }`}
+                              disabled={checkingFree}
+                            >
+                              {checkingFree ? 'CHECKING…' : 'CHECK'}
+                            </button>
+                          )}
 
                           <button
                             type="button"
@@ -664,15 +722,15 @@ const FinLitPlatform = () => {
                             onClick={() => {
                               const idxAtClick = currentQuestionIdx;
                               // Only allow next if this question is marked correct via CHECK
-                              if (questionCorrectMap[q.id]) {
+                              if (questionCorrectMap[qKey]) {
                                 setCheckMessage(null);
                                 setCurrentQuestionIdx((prev) => (prev === idxAtClick && prev < totalQuestions - 1 ? prev + 1 : prev));
                               } else {
                                 setCheckMessage('❌ Please check your answer first.');
                               }
                             }}
-                            disabled={currentQuestionIdx >= totalQuestions - 1 || checkingFree || !questionCorrectMap[q.id]}
-                            className="px-6 bg-gray-100 text-gray-700 font-bold rounded-2xl border-2 border-gray-200 hover:bg-gray-200 disabled:opacity-50"
+                            disabled={currentQuestionIdx >= totalQuestions - 1 || checkingFree || !questionCorrectMap[qKey]}
+                            className={`${questionCorrectMap[qKey] ? 'w-full bg-green-600 text-white text-xl py-5' : 'px-6 bg-gray-100 text-gray-700'} font-bold rounded-2xl border-2 border-gray-200 hover:bg-gray-200 disabled:opacity-50`}
                           >
                             NEXT
                           </button>
@@ -780,6 +838,19 @@ const FinLitPlatform = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+      {/* Audio elements */}
+      <audio ref={correctAudioRef} src="/success.mp3" preload="auto" />
+      <audio ref={wrongAudioRef} src="/wrong.mp3" preload="auto" />
+
+      {/* Full-screen confetti overlay */}
+      {globalConfetti.length > 0 && (
+        <div className="fixed inset-0 pointer-events-none z-40">
+          {globalConfetti.map((c, idx) => (
+            <div key={idx} className="confetti-dot" style={{ left: c.x, top: c.y, backgroundColor: c.color }} />
+          ))}
+        </div>
+      )}
+
       {/* Header - Duolingo Style */}
       <header className="bg-white border-b-2 border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">

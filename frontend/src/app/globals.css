@@ -54,13 +54,21 @@ body {
 @keyframes confetti-pop {
   0% { transform: translateY(-10px) scale(0.8); opacity: 0; }
   50% { transform: translateY(-6px) scale(1.05); opacity: 1; }
-  100% { transform: translateY(0) scale(1); opacity: 0; }
+  100% { transform: translateY(20px) scale(1); opacity: 0; }
+}
+
+/* Red flash ring for incorrect without layout shift */
+@keyframes red-flash {
+  0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.45); }
+  70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
 }
 
 .anim-pop-in { animation: pop-in 300ms ease-out; }
 .anim-bounce { animation: subtle-bounce 1.8s ease-in-out infinite; }
 .anim-pulse-ring { animation: pulse-ring 1.8s ease-out infinite; }
 .anim-shake { animation: shake 400ms ease-in-out; }
+.anim-red-flash { animation: red-flash 700ms ease-out; }
 
 /* Confetti bits container */
 .confetti { position: relative; }
@@ -72,3 +80,9 @@ body {
 }
 .confetti::before { background: #f59e0b; left: -12px; top: -6px; }
 .confetti::after { background: #22c55e; right: -12px; top: -6px; }
+
+/* Full-screen confetti dots */
+.confetti-dot { position: absolute; width: 8px; height: 8px; border-radius: 2px; animation: confetti-pop 900ms ease-out forwards; }
+
+/* Incorrect X pop */
+.x-pop { animation: pop-in 250ms ease-out; font-size: 1.75rem; color: #f43f5e; text-shadow: 0 2px 6px rgba(244, 63, 94, 0.4); }
