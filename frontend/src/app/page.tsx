@@ -302,6 +302,7 @@ const MonetaPlatform = () => {
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [showAchievementModal, setShowAchievementModal] = useState(false);
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
+  const [showAllAchievementsModal, setShowAllAchievementsModal] = useState(false);
 
   // Check if user has unlocked an achievement
   const checkAchievements = (completedLessons: number[], streak: number, perfectScores: number) => {
@@ -746,10 +747,18 @@ const MonetaPlatform = () => {
 
       {/* Achievements */}
       <div className="bg-white rounded-3xl p-6 shadow-lg border-2 border-gray-100">
-        <h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
-          <Trophy className="w-6 h-6 text-amber-500" />
-          Achievements ({unlockedAchievements.length}/{ACHIEVEMENTS.length})
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-black text-gray-800 flex items-center gap-2">
+            <Trophy className="w-6 h-6 text-amber-500" />
+            Achievements ({unlockedAchievements.length}/{ACHIEVEMENTS.length})
+          </h3>
+          <button
+            onClick={() => setShowAllAchievementsModal(true)}
+            className="text-sm font-bold text-sky-600 hover:text-sky-700 underline transition-colors"
+          >
+            See All
+          </button>
+        </div>
         <div className="grid grid-cols-3 gap-3">
           {ACHIEVEMENTS.slice(0, 6).map(achievement => {
             const isUnlocked = unlockedAchievements.includes(achievement.id);
@@ -785,7 +794,7 @@ const MonetaPlatform = () => {
               }}
               className="text-blue-600 hover:text-blue-800 font-semibold underline"
             >
-              View All ({unlockedAchievements.length})
+              
             </button>
           </div>
         )}
@@ -1417,6 +1426,109 @@ const MonetaPlatform = () => {
             >
               Awesome! 🎉
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* All Achievements Modal */}
+      {showAllAchievementsModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-amber-400 to-orange-500 p-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Trophy className="w-8 h-8 text-white" />
+                <h2 className="text-3xl font-black text-white">
+                  All Achievements
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowAllAchievementsModal(false)}
+                className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="px-6 pt-4 pb-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-gray-700">
+                  Progress: {unlockedAchievements.length} / {ACHIEVEMENTS.length}
+                </span>
+                <span className="text-sm font-bold text-amber-600">
+                  {Math.round((unlockedAchievements.length / ACHIEVEMENTS.length) * 100)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-amber-400 to-orange-500 h-full transition-all duration-500 rounded-full"
+                  style={{ width: `${(unlockedAchievements.length / ACHIEVEMENTS.length) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Achievements Grid */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-3 gap-4">
+                {ACHIEVEMENTS.map(achievement => {
+                  const isUnlocked = unlockedAchievements.includes(achievement.id);
+                  return (
+                    <div 
+                      key={achievement.id}
+                      className={`relative p-5 rounded-2xl border-2 transition-all ${
+                        isUnlocked 
+                          ? 'bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-300' 
+                          : 'bg-gray-50 border-gray-200 opacity-70'
+                      }`}
+                    >
+                      {/* Unlocked Badge */}
+                      {isUnlocked && (
+                        <div className="absolute top-2 right-2">
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        </div>
+                      )}
+
+                      {/* Icon */}
+                      <div className={`text-5xl mb-3 text-center ${!isUnlocked && 'opacity-40 grayscale'}`}>
+                        {achievement.icon}
+                      </div>
+
+                      {/* Title */}
+                      <div className={`text-sm font-black text-center mb-2 ${
+                        isUnlocked ? 'text-amber-700' : 'text-gray-500'
+                      }`}>
+                        {achievement.title}
+                      </div>
+
+                      {/* Description */}
+                      <div className={`text-xs text-center ${
+                        isUnlocked ? 'text-gray-700' : 'text-gray-400'
+                      }`}>
+                        {achievement.description}
+                      </div>
+
+                      {/* Lock Overlay */}
+                      {!isUnlocked && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/10 rounded-2xl">
+                          <Lock className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t-2 border-gray-100 p-6 bg-gray-50">
+              <button
+                onClick={() => setShowAllAchievementsModal(false)}
+                className="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white font-black text-lg py-4 rounded-2xl hover:scale-[1.02] transition-transform shadow-lg"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
