@@ -171,24 +171,26 @@ const MonetaPlatform = () => {
   });
   const [progressUnlocked, setProgressUnlocked] = useState<string[]>([]);
   const [lastStreakDate, setLastStreakDate] = useState<string | null>(null);
+  const [showStreakModal, setShowStreakModal] = useState(false);
+  const [newStreakValue, setNewStreakValue] = useState(0);
 
-  // Increment streak once per calendar day upon successful quiz completion
-  const maybeIncrementStreakForToday = async (newXp: number, nodeXp: number) => {
-    try {
-      const today = new Date();
-      const key = today.toISOString().slice(0, 10); // YYYY-MM-DD
-      if (lastStreakDate === key) {
-        await setProgress(handleId, { xp: newXp });
-        return { streak: userProgress.streak, lastDate: lastStreakDate };
-      }
-      const updatedStreak = userProgress.streak + 1;
-      await setProgress(handleId, { xp: newXp, streak: updatedStreak });
-      try { localStorage.setItem('moneta_last_streak_date', key); } catch (_) {}
-      setLastStreakDate(key);
-      return { streak: updatedStreak, lastDate: key };
-    } catch (_) {
-      return { streak: userProgress.streak, lastDate: lastStreakDate };
+  // Check if we should increment streak for today (once per calendar day)
+  const maybeIncrementStreakForToday = () => {
+    const today = new Date();
+    const key = today.toISOString().slice(0, 10); // YYYY-MM-DD
+    
+    // Already completed a lesson today, don't increment
+    if (lastStreakDate === key) {
+      return { shouldIncrement: false, streak: userProgress.streak, dateKey: key };
     }
+    
+    // New day! Increment streak
+    const updatedStreak = userProgress.streak + 1;
+    // Store per-user to prevent cross-user contamination
+    const storageKey = `moneta_last_streak_date_${handleId}`;
+    try { localStorage.setItem(storageKey, key); } catch (_) {}
+    setLastStreakDate(key);
+    return { shouldIncrement: true, streak: updatedStreak, dateKey: key };
   };
 
   useEffect(() => {
@@ -234,11 +236,20 @@ const MonetaPlatform = () => {
         // best-effort: keep defaults when backend not available
       }
       try {
-        const saved = typeof window !== 'undefined' ? localStorage.getItem('moneta_last_streak_date') : null;
+        // Use per-user localStorage key to prevent cross-user contamination
+        const storageKey = `moneta_last_streak_date_${handleId}`;
+        const saved = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
         if (saved) setLastStreakDate(saved);
+        
+        // Clean up old global key (migration)
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('moneta_last_streak_date');
+          } catch (_) {}
+        }
       } catch (_) {}
     })();
-  }, [userData?.username]); // Re-run when user changes
+  }, [userData?.username, handleId]); // Re-run when user changes
 
   // Lessons path (visual nodes). Content is generated via backend when opened
   const lessons = [
@@ -411,23 +422,42 @@ const MonetaPlatform = () => {
         const updatedCompleted = userProgress.completedLessons.includes(node.id)
           ? userProgress.completedLessons
           : [...userProgress.completedLessons, node.id];
-        const { streak: maybeNewStreak } = await maybeIncrementStreakForToday(newXp, node.xp);
+        
+        // Check if we should increment streak
+        const streakResult = maybeIncrementStreakForToday();
+        const finalStreak = streakResult.streak;
+        
         // Persist xp/streak and completed lessons to backend
         let savedDailyXp = userProgress.dailyProgress + node.xp;
+        const progressUpdate = { 
+          xp: newXp, 
+          streak: finalStreak, 
+          completed_lessons: updatedCompleted 
+        };
+        
         try {
-          const saved = await setProgress(handleId, { xp: newXp, streak: maybeNewStreak, completed_lessons: updatedCompleted });
+          const saved = await setProgress(handleId, progressUpdate);
           if (typeof saved?.daily_xp === 'number') savedDailyXp = saved.daily_xp;
         } catch (_) {}
+        
         setUserProgress((prev) => ({
           ...prev,
           xp: newXp,
           level: calculateLevel(newXp),
-          streak: maybeNewStreak,
+          streak: finalStreak,
           completedLessons: updatedCompleted,
           dailyProgress: savedDailyXp,
         }));
+        
+        // Show celebration
         setShowCelebration(true);
         setTimeout(() => setShowCelebration(false), 3000);
+        
+        // Show streak modal if streak was incremented
+        if (streakResult.shouldIncrement) {
+          setNewStreakValue(finalStreak);
+          setShowStreakModal(true);
+        }
       }
     } catch (e) {
       // ignore for MVP
@@ -1073,6 +1103,34 @@ const MonetaPlatform = () => {
       {showCelebration && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
           <div className="text-9xl animate-bounce">🎉</div>
+        </div>
+      )}
+
+      {/* Streak Celebration Modal */}
+      {showStreakModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm">
+          <div className="bg-gradient-to-br from-orange-400 via-red-500 to-pink-500 rounded-3xl p-12 shadow-2xl max-w-md mx-4 text-center">
+            {/* Animated Fire Emoji */}
+            <div className="text-8xl mb-6 anim-fire-pulse">
+              🔥
+            </div>
+            
+            {/* Streak Text */}
+            <h2 className="text-5xl font-black text-white mb-3">
+              {newStreakValue} Day Streak!
+            </h2>
+            <p className="text-xl text-white/90 mb-8 font-semibold">
+              Keep up the momentum!
+            </p>
+            
+            {/* Commitment Button */}
+            <button
+              onClick={() => setShowStreakModal(false)}
+              className="bg-white text-gray-900 font-black text-2xl py-4 px-12 rounded-2xl hover:scale-105 transition-transform shadow-xl"
+            >
+              I&apos;m Committed! 💪
+            </button>
+          </div>
         </div>
       )}
     </div>

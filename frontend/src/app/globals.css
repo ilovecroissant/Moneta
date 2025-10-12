@@ -64,11 +64,32 @@ body {
   100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
 }
 
+/* Fire emoji pulse animation for streak modal */
+@keyframes fire-pulse {
+  0%, 100% { 
+    transform: scale(1) rotate(-5deg); 
+    filter: drop-shadow(0 0 20px rgba(251, 146, 60, 0.8));
+  }
+  25% { 
+    transform: scale(1.15) rotate(5deg); 
+    filter: drop-shadow(0 0 30px rgba(251, 146, 60, 1));
+  }
+  50% { 
+    transform: scale(1.05) rotate(-3deg); 
+    filter: drop-shadow(0 0 25px rgba(251, 146, 60, 0.9));
+  }
+  75% { 
+    transform: scale(1.2) rotate(3deg); 
+    filter: drop-shadow(0 0 35px rgba(251, 146, 60, 1));
+  }
+}
+
 .anim-pop-in { animation: pop-in 300ms ease-out; }
 .anim-bounce { animation: subtle-bounce 1.8s ease-in-out infinite; }
 .anim-pulse-ring { animation: pulse-ring 1.8s ease-out infinite; }
 .anim-shake { animation: shake 400ms ease-in-out; }
 .anim-red-flash { animation: red-flash 700ms ease-out; }
+.anim-fire-pulse { animation: fire-pulse 1.5s ease-in-out infinite; }
 
 /* Confetti bits container */
 .confetti { position: relative; }

@@ -24,8 +24,10 @@ def _get_or_create_user(handle: str) -> User:
         if user:
             return user
     # Create a basic user if not found (for backward compatibility)
+    # Use a dummy email for legacy/guest users
     with get_session() as session:
-        user = User(username=handle, xp=0, streak=0)
+        dummy_email = f"{handle}@legacy.local"
+        user = User(username=handle, email=dummy_email, xp=0, streak=0)
         session.add(user)
         session.commit()
         session.refresh(user)
@@ -137,10 +139,11 @@ def set_progress(handle: str, body: ProgressUpdate) -> Progress:
         ).all()
     daily_xp = sum(e.xp_delta for e in events)
 
+    # Return values from User table (authoritative source), not UserProgressRecord
     return Progress(
         handle=handle, 
-        xp=rec.xp, 
-        streak=rec.streak, 
+        xp=user_db.xp, 
+        streak=user_db.streak, 
         unlocked=unlocked,
         completed_lessons=completed_lessons,
         daily_xp=daily_xp,
