@@ -164,7 +164,7 @@ const MonetaPlatform = () => {
     xp: 0,
     level: 1,
     streak: 0,
-    completedLessons: [0],
+    completedLessons: [] as number[],
     dailyGoal: 50,
     dailyProgress: 0,
   });
@@ -487,11 +487,9 @@ const MonetaPlatform = () => {
         <div className="relative">
           {lessons.map((lesson, index) => {
             const isCompleted = userProgress.completedLessons.includes(lesson.id);
-            const token = `${CATEGORY_MAP[lesson.category] || lesson.category}:1`;
-            const categoryUnlocked = progressUnlocked.includes(token);
-            const isLocked = lesson.difficulty > 1 || !categoryUnlocked;
-            const isNext = !isCompleted && !isLocked && 
-                          (index === 0 || userProgress.completedLessons.includes(lessons[index - 1].id));
+            // Sequential unlock: first lesson always unlocked, others unlock after completing previous
+            const isLocked = index > 0 && !userProgress.completedLessons.includes(lessons[index - 1].id);
+            const isNext = !isCompleted && !isLocked;
             
             return (
               <div

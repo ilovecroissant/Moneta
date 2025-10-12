@@ -10,17 +10,10 @@ from ..schemas import Progress
 router = APIRouter(prefix="/progress", tags=["progress"])
 
 
-CATEGORIES = [
-    "Budgeting & Saving Basics",
-    "Credit & Debt",
-    "Investing & Risk",
-    "Taxes & Retirement",
-]
-
-
 class ProgressUpdate(BaseModel):
     xp: int | None = None
     streak: int | None = None
+    completed_lessons: list[int] | None = None
 
 
 def _get_or_create_user(handle: str) -> User:
@@ -61,9 +54,24 @@ def _get_or_create_progress(user_id: int) -> UserProgressRecord:
 def get_progress(handle: str) -> Progress:
     user = _get_or_create_user(handle)
     rec = _get_or_create_progress(user.id)
-    unlocked = [f"{c}:1" for c in CATEGORIES] if user.xp >= 0 else []
-    # Return XP and streak from User table (authoritative source)
-    return Progress(handle=handle, xp=user.xp, streak=user.streak, unlocked=unlocked)
+    
+    # Sequential unlock is now handled by frontend based on completion order
+    # No need for unlock tokens anymore
+    unlocked = []
+    
+    # Parse completed lessons from comma-separated string
+    completed_lessons = []
+    if user.completed_lessons:
+        completed_lessons = [int(x) for x in user.completed_lessons.split(",") if x.strip()]
+    
+    # Return XP, streak, and completed lessons from User table (authoritative source)
+    return Progress(
+        handle=handle, 
+        xp=user.xp, 
+        streak=user.streak, 
+        unlocked=unlocked,
+        completed_lessons=completed_lessons
+    )
 
 
 @router.post("/{handle}", response_model=Progress)
@@ -80,13 +88,30 @@ def set_progress(handle: str, body: ProgressUpdate) -> Progress:
         if body.streak is not None:
             rec.streak = body.streak
             user_db.streak = body.streak  # Also update User table
+        if body.completed_lessons is not None:
+            # Convert list to comma-separated string
+            user_db.completed_lessons = ",".join(str(x) for x in body.completed_lessons)
         
         session.add(rec)
         session.add(user_db)
         session.commit()
         session.refresh(rec)
         session.refresh(user_db)
-    unlocked = [f"{c}:1" for c in CATEGORIES] if rec.xp >= 0 else []
-    return Progress(handle=handle, xp=rec.xp, streak=rec.streak, unlocked=unlocked)
+    
+    # Sequential unlock is now handled by frontend based on completion order
+    unlocked = []
+    
+    # Parse completed lessons for response
+    completed_lessons = []
+    if user_db.completed_lessons:
+        completed_lessons = [int(x) for x in user_db.completed_lessons.split(",") if x.strip()]
+    
+    return Progress(
+        handle=handle, 
+        xp=rec.xp, 
+        streak=rec.streak, 
+        unlocked=unlocked,
+        completed_lessons=completed_lessons
+    )
 
 

@@ -93,6 +93,7 @@ class Progress(BaseModel):
     xp: int
     streak: int
     unlocked: List[str]
+    completed_lessons: List[int] = []
 
 
 # --- Authentication ---

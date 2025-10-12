@@ -12,6 +12,7 @@ class User(SQLModel, table=True):
     display_name: Optional[str] = Field(default=None)
     xp: int = Field(default=0)
     streak: int = Field(default=0)
+    completed_lessons: str = Field(default="")  # Comma-separated lesson IDs
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: datetime = Field(default_factory=datetime.utcnow)
 
