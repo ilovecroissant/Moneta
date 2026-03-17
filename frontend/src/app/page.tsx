@@ -1389,10 +1389,10 @@ const MonetaPlatform = () => {
                 <span className="font-black text-amber-700 dark:text-amber-100">{userProgress.xp}</span>
               </div>
               <button
-                onClick={() => router.push('/profile')}
+                onClick={() => router.push(isGuest ? '/login' : '/profile')}
                 className="ml-2 w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold rounded-full hover:from-blue-600 hover:to-purple-700 transform transition-all hover:scale-110 border-b-4 border-purple-700 flex items-center justify-center"
                 style={{ boxShadow: '0 4px 0 #6b21a8, 0 6px 12px rgba(147, 51, 234, 0.4)' }}
-                title="View Profile"
+                title={isGuest ? 'Sign In' : 'View Profile'}
               >
                 <User className="w-5 h-5" />
               </button>
