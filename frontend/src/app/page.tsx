@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, memo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trophy, Star, Flame, MessageCircle, Lock, CheckCircle, BookOpen, Send, X, Zap, User } from 'lucide-react';
 import {
@@ -148,26 +148,16 @@ const ACHIEVEMENTS: Achievement[] = [
   }
 ];
 
-// Memoized question component to prevent re-renders
-const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegisterRef }: { 
+// Question input component
+const QuestionInput = ({ question, value, onChange, onLiveChange, onRegisterRef }: { 
   question: Question; 
   value: string; 
   onChange: (val: string) => void;
   onLiveChange?: (val: string) => void;
   onRegisterRef?: (el: HTMLTextAreaElement | null) => void;
 }) => {
-  const [localValue, setLocalValue] = useState(value);
   const freeRef = React.useRef<HTMLTextAreaElement | null>(null);
-
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
-
-  const handleBlur = () => {
-    if (localValue !== value) {
-      onChange(localValue);
-    }
-  };
+  const fillRef = React.useRef<HTMLInputElement | null>(null);
 
   if (question.type === 'mcq') {
     return (
@@ -194,10 +184,17 @@ const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegiste
   if (question.type === 'fill') {
     return (
       <input
+        ref={fillRef}
         type="text"
-        value={localValue}
-        onChange={(e) => { const v = e.target.value; setLocalValue(v); onLiveChange && onLiveChange(v); }}
-        onBlur={handleBlur}
+        defaultValue={value}
+        onInput={(e) => {
+          const val = (e.target as HTMLInputElement).value;
+          onLiveChange && onLiveChange(val);
+        }}
+        onBlur={(e) => {
+          const val = e.target.value;
+          onChange(val);
+        }}
         placeholder="Type your answer"
         className="w-full border-2 border-gray-300 dark:border-gray-600 rounded-2xl px-4 py-4 font-semibold text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-gray-800 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
         autoComplete="off"
@@ -230,9 +227,7 @@ const QuestionInput = memo(({ question, value, onChange, onLiveChange, onRegiste
   }
 
   return null;
-});
-
-QuestionInput.displayName = 'QuestionInput';
+};
 
 const MonetaPlatform = () => {
   const router = useRouter();
@@ -254,16 +249,18 @@ const MonetaPlatform = () => {
 
   // Auth check on mount
   useEffect(() => {
-    setIsMounted(true);
     const authToken = localStorage.getItem('authToken');
     const isGuestMode = localStorage.getItem('isGuest') === 'true';
     const savedUserData = localStorage.getItem('userData');
     
+    // Redirect to login if not authenticated
     if (!authToken && !isGuestMode) {
       router.push('/login');
       return;
     }
     
+    // Only set mounted if authenticated
+    setIsMounted(true);
     setIsGuest(isGuestMode);
     if (savedUserData) {
       setUserData(JSON.parse(savedUserData));
@@ -688,9 +685,11 @@ const MonetaPlatform = () => {
         lesson: generatedLesson,
         answers: generatedLesson.questions.map((q, idx) => {
           const key = q.id || `q-${idx}`;
+          // Use liveAnswersRef as fallback to catch unsaved changes
+          const answer = userAnswers[key] || liveAnswersRef.current[key] || '';
           return {
             question_id: q.id,
-            user_answer: userAnswers[key] || '',
+            user_answer: answer,
           };
         }),
       });
@@ -1260,9 +1259,10 @@ const MonetaPlatform = () => {
           ) : (
             <div className="text-center py-12">
               {generatedLesson?.questions.map((q, qIndex) => {
+                const qKey = q.id || `q-${qIndex}`;
                 const detail = evaluation.details.find((d) => d.question_id === q.id);
                 const isCorrect = !!detail?.correct;
-                const userAns = userAnswers[q.id] || '';
+                const userAns = userAnswers[qKey] || '';
                 const correctAns = detail?.correct_answer || '';
                 const correctText = q.type === 'mcq'
                   ? (q.options || []).find((o) => o.id === correctAns)?.text || correctAns
@@ -1374,8 +1374,17 @@ const MonetaPlatform = () => {
                 💰 Moneta
               </div>
               {isMounted && isGuest && (
-                <div className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                  (Guest Mode - Progress won&apos;t save)
+                <div className="flex items-center gap-3">
+                  <div className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                    (Guest Mode - Progress won&apos;t save)
+                  </div>
+                  <button
+                    onClick={() => router.push('/login')}
+                    className="bg-gradient-to-r from-green-500 to-blue-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:from-green-600 hover:to-blue-700 transition-all border-b-4 border-blue-700 shadow-md"
+                    style={{ boxShadow: '0 4px 0 #1d4ed8, 0 6px 12px rgba(37, 99, 235, 0.3)' }}
+                  >
+                    Create Account
+                  </button>
                 </div>
               )}
             </div>

@@ -55,12 +55,29 @@ You are a friendly finance tutor for teens. Create a concise lesson as strict JS
 
 Constraints:
 - Exactly {req.num_questions} questions.
+- **CRITICAL: Keep ALL question prompts SHORT (1-2 sentences maximum, 15-25 words ideal).**
+- Questions should be quick to read and understand at a glance.
+- For MCQ: Make the question clear and concise - users should be able to quickly scan and answer.
+- For fill-in-blank: One short sentence with a single blank.
+- For free response: One direct, specific question (1 sentence).
+- MCQ options should be SHORT (3-8 words each max).
 - For every question with type "mcq": include exactly 4 options with ids A, B, C, D.
 - For every "mcq": set "correct_answer" to one of "A","B","C","D".
+- DO NOT create long word problems or complex scenarios.
+- DO NOT create obvious true/false questions or questions that simply restate definitions.
+- Questions should test practical understanding with clear, direct language.
 - Tone: short, warm, Duolingo-like.
-- Explanations are one-liners.
+- Explanations are one-liners (10-15 words max).
 - Keep math simple and age-appropriate.
 - Return ONLY JSON with the exact fields.
+
+Examples of GOOD short questions:
+- MCQ: "What's the first step in creating a budget?" (7 words)
+- Fill: "A _______ is money you earn from a job." (9 words)
+- Free: "Why should you save before spending?" (6 words)
+
+Examples of BAD (too long):
+- "Sarah receives $50 allowance monthly and wants to save for a $200 phone while spending $15 on snacks and $10 on games. How should she budget?" (31 words - TOO LONG)
 
 Topic: {req.category}
 Level: {req.level}
